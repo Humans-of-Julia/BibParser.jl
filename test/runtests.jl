@@ -2,8 +2,7 @@ using BibParser
 using Automa
 using Test
 
-# write your own tests here
-println(BibParser.parsebib("../examples/tidy.bib"))
+@time println(BibParser.parsebibfile("../examples/test.bib"))
 
-write("actions.dot", Automa.machine2dot(BibParser.bibmachine))
-run(`dot -Tpng -o actions.png actions.dot`)
+# write("actions.dot", Automa.machine2dot(BibParser.bibtex_machine))
+# run(`dot -Tsvg -o actions.svg actions.dot`)
