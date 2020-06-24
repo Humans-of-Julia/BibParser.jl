@@ -1,111 +1,129 @@
 # Concatenation with spaces: \times (tab completion)
 × = (x::re.RE, y::re.RE)->x * re.rep(re"[\t\n\r ]") * y
 
-# Finite-State Machine (FSM) for the BibTeX language
-const bibtex_machine = (
-    function ()
-    # Bib grammar (slightly simplified)
-    # TODO: doc the simplified bib grammar
-    space               = re"[\t\n\r ]"
+const machine = (
+    function () # Grammar
+    # Basic regexp
+    publication_type    = re"@[A-Za-z]+"
     field_name          = re"[A-Za-z]+"
-    number              = re"[0-9]+"
-    in_quote            = !re"[\"{}]"
-    in_braces           = !re"[@{}]"
-    left_brace          = re"{"
-    right_brace         = re"}"
+    in_braces           = re"[^@{}]"
+    in_quotes           = re"[^\"]"
     key                 = re"[A-Za-z][0-9A-Za-z_:/]*"
-    publication_type    = re"[A-Za-z]+"
+    left_brace          = re"{"
+    number              = re"[0-9]+"
+    quotes              = re"\""
+    right_brace         = re"}"
+    space               = re"[\t\n\r ]"
 
-    # TODO: .when field for brace values
-    brace_value     = re"{" * re.rep(in_braces | left_brace | right_brace) * re"}"
-    quote_value     = re"\"" * re.rep(brace_value | in_quote) * re"\""
+    # Complex regexp
+    brace_value     = left_brace * re.rep(in_braces | left_brace | right_brace) * right_brace
+    quote_value     = quotes * re.rep(brace_value | in_quotes) * quotes
     value           = number | quote_value | brace_value
-    # field_value     = re.rep(value × re"#") × value
-    field           = field_name × re"=" × value
-    fields          = re.rep(re"," × field)
+    field_value     = re.rep(value × re"#") × value    
+    field           = field_name × re"=" × field_value
+    fields          = re.rep(re"," × field)    
     entry_content   = key × fields × re.opt(re",")
-    brace_entry     = re"{" × entry_content × re"}"
-    publication     = re"@" * publication_type × brace_entry
+    brace_entry     = left_brace × entry_content × right_brace
+    publication     = publication_type × brace_entry
     bibliography    = re.rep(space | publication)
 
-    # Conditional actions
-    # brace_value.when = :condition
 
     # RegExp/States Actions
-    brace_value.actions[:enter]         = [:mark_in]
-    brace_value.actions[:exit]          = [:mark_out, :value]
+    brace_value.actions[:enter]         = [:brace_in]
+    brace_value.actions[:exit]          = [:brace_out, :brace_value]
+    # field.actions[:enter]               = [:print_info]
+    # field.actions[:exit]                = [:print_field]    
     field.actions[:exit]                = [:add_field]
     field_name.actions[:enter]          = [:mark_in]
     field_name.actions[:exit]           = [:mark_out, :field_name]
+    field_value.actions[:enter]         = [:clean_field]
     key.actions[:enter]                 = [:mark_in]
     key.actions[:exit]                  = [:mark_out, :key]
-    left_brace.actions[:exit]           = [:count_in]
-    number.actions[:enter]              = [:mark_in]
-    number.actions[:exit]               = [:mark_out, :number]
-    publication.actions[:enter]         = [:clean_fields]
+    left_brace.actions[:exit]           = [:inc_braces]
+    number.actions[:enter]              = [:number_in]
+    number.actions[:exit]               = [:number_out, :number_value]
+    publication.actions[:enter]         = [:clean_entry]
     publication.actions[:exit]          = [:add_entry]
     publication_type.actions[:enter]    = [:mark_in]
     publication_type.actions[:exit]     = [:mark_out, :publication_type]
-    quote_value.actions[:enter]         = [:mark_in]
-    quote_value.actions[:exit]          = [:mark_out, :value]
-    right_brace.actions[:enter]         = [:count_out]
+    quote_value.actions[:enter]         = [:quote_in]
+    quote_value.actions[:exit]          = [:quote_out, :quote_value]
+    quotes.actions[:enter]              = [:in_quotes]
+    right_brace.actions[:enter]         = [:dec_braces]
+    value.actions[:enter]               = [:clean_counters]
 
     return Automa.compile(bibliography)
-end)()
+end
+)()
 
 # Generate actions for the FSM
 const bibtex_actions = Dict(
-    :add_entry        => :(entries[key] = Entry(Symbol(publication_type), key, fields)),
-    :add_field        => :(fields[Symbol(field_name)] = value),
-    # :cat_quote        => :(value *= data[mark_in + 1:mark_out - 2]),
-    # :cat_var          => :(value *= strings[search_name]),
-    :clean_fields     => :(fields = BibInternal.EntryFields()),
-    :condition        => :(acc == 0),
-    :count_in         => :(acc += 1),
-    :count_out        => :(acc -= 1),
-    # :empty_string     => :(value = ""),
-    :field_name       => :(field_name = lowercase(data[mark_in:mark_out - 1])),
-    :key              => :(key = data[mark_in:mark_out - 1]),
-    :mark_in          => :(mark_in = p),
-    :mark_out         => :(mark_out = p),
-    :number           => :(value = data[mark_in:mark_out - 1]),
-    :publication_type => :(publication_type = lowercase(data[mark_in:mark_out - 2])),
-    # :search_name      => :(search_name = lowercase(data[mark_in:mark_out - 1])),
-    :value            => :(value = data[mark_in + 1:mark_out - 2]))
+    :add_entry          => :(entries[key] = Entry(Symbol(publication_type), key, fields)),
+    :add_field          => :(fields[Symbol(field_name)] = value),
+    :brace_in           => :(brace_in = p),
+    :brace_out          => :(brace_out = p),
+    :brace_value        => :(in_braces == 0 && !in_quotes ? value *= data[brace_in + 1:brace_out - 2] : ()),
+    :clean_counters     => :(in_quotes ? () : in_braces = 0),
+    :clean_field        => :(value = ""),
+    :clean_entry        => :(fields = BibInternal.EntryFields()),
+    :dec_braces         => :(in_braces -= 1),
+    :field_name         => :(field_name = lowercase(data[mark_in:mark_out - 1])),
+    :in_quotes          => :(in_braces == 0 ? in_quotes = !in_quotes : ()),
+    :inc_braces         => :(in_braces += 1),
+    :key                => :(key = data[mark_in:mark_out - 1]),
+    :mark_in            => :(mark_in = p),
+    :mark_out           => :(mark_out = p),
+    :number_in          => :(number_in = p),
+    :number_out         => :(number_out = p),
+    :number_value       => :(value *= data[number_in:number_out - 1]),
+    # TODO: why is the value == "" necessary (debug)
+    # TODO: bug with }} when the second brace is to close the entry
+    # :print_field        => :(println(value == "" ? "field: $field_name = \"\"" : "field: $field_name = $value")),
+    # :print_info         => :(println("info: $(data[1:p - 1])")),
+    :publication_type   => :(publication_type = lowercase(data[mark_in + 1:mark_out - 1])),
+    :quote_in           => :(quote_in = p),
+    :quote_out          => :(quote_out = p),
+    :quote_value        => :(in_braces == 0 ? value *= data[quote_in + 1:quote_out - 2] : ()),
+)
 
 const context = Automa.CodeGenContext()
 
-@eval function parsebib(data::AbstractString)
-    # initialize the variables to store the parsed code
+@eval function parse(data::AbstractString)
+    # Variables to store data
     entries          = Dict{AbstractString,BibInternal.Entry}()
-    # strings          = Dict{AbstractString,AbstractString}()
     fields           = BibInternal.EntryFields()
-    publication_type = ""
-    key              = ""
     field_name       = ""
+    key              = ""
+    publication_type = ""
     value            = ""
-    # search_name = ""
+
+    # Marks where to extract strings 
     mark_in          = 0
     mark_out         = 0
-    acc              = 0
+    brace_in         = 0
+    brace_out        = 0
+    quote_in         = 0
+    quote_out        = 0
+    number_in        = 0
+    number_out       = 0
+
+    # Counting braces, and marking in quotes field values
+    in_quotes        = false
+    in_braces        = 0 # left braces increment by one, right ones decrement
 
     # generate code to initialize variables used by FSM
-    $(Automa.generate_init_code(context, bibtex_machine))
+    $(Automa.generate_init_code(context, machine))
 
     # set end and EOF positions of data buffer
     p_end = p_eof = sizeof(data)
 
     # generate code to execute FSM
-    $(Automa.generate_exec_code(context, bibtex_machine, bibtex_actions))
+    $(Automa.generate_exec_code(context, machine, bibtex_actions))
 
     # check if FSM properly finished and returm the state of the FSM
     return entries, cs == 0 ? :ok : cs < 0 ? :error : :incomplete
 end
 
-function parsebibfile(path::AbstractString)
-    return parsebib(open(x->read(x, String), path))
+function parse_file(path::AbstractString)
+    return parse(open(x->read(x, String), path))
 end
-
-
-
-
