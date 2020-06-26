@@ -11,4 +11,7 @@ const re = Automa.RegExp
 
 include("bibtex.jl")
 
+include("precompile.jl")
+_precompile_()
+
 end # module

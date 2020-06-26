@@ -6,3 +6,4 @@ version = "0.1.0"
 [deps]
 Automa = "67c07d97-cdcb-5c2c-af73-a7f9c32a568b"
 BibInternal = "2027ae74-3657-4b95-ae00-e2f7d55c3e64"
+SnoopCompile = "aa65fe97-06da-5843-b5b1-d5d13cad87d2"

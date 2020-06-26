@@ -24,7 +24,7 @@ const machine = (
     fields          = re.rep(re"," × field)    
     entry_content   = key × fields × re.opt(re",")
     brace_entry     = left_brace × entry_content × right_brace
-    publication     = publication_type × brace_entry
+    publication     = publication_type × brace_entry 
     bibliography    = re.rep(space | publication)
 
 
