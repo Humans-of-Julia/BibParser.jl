@@ -1,5 +1,7 @@
+using BibInternal.BibTeX
+
 # Concatenation with spaces: \times (tab completion)
-× = (x::re.RE, y::re.RE)->x * re.rep(re"[\t\n\r ]") * y
+× = (x::re.RE, y::re.RE) -> x * re.rep(re"[\t\n\r ]") * y
 
 const machine = (
     function () # Grammar
@@ -58,14 +60,14 @@ end
 
 # Generate actions for the FSM
 const bibtex_actions = Dict(
-    :add_entry          => :(entries[key] = Entry(Symbol(publication_type), key, fields)),
-    :add_field          => :(fields[Symbol(field_name)] = value),
+    :add_entry          => :(entries[key] = BibInternal.BibTeX.make_bibtex_entry(publication_type, key, fields)),
+    :add_field          => :(fields[field_name] = value),
     :brace_in           => :(brace_in = p),
     :brace_out          => :(brace_out = p),
     :brace_value        => :(in_braces == 0 && !in_quotes ? value *= data[brace_in + 1:brace_out - 2] : ()),
     :clean_counters     => :(in_quotes ? () : in_braces = 0),
     :clean_field        => :(value = ""),
-    :clean_entry        => :(fields = BibInternal.EntryFields()),
+    :clean_entry        => :(fields = Dict{AbstractString,AbstractString}()),
     :dec_braces         => :(in_braces -= 1),
     :field_name         => :(field_name = lowercase(data[mark_in:mark_out - 1])),
     :in_quotes          => :(in_braces == 0 ? in_quotes = !in_quotes : ()),
@@ -90,8 +92,8 @@ const context = Automa.CodeGenContext()
 
 @eval function parse(data::AbstractString)
     # Variables to store data
-    entries          = Dict{AbstractString,BibInternal.Entry}()
-    fields           = BibInternal.EntryFields()
+    entries          = Dict{AbstractString,BibInternal.AbstractEntry}()
+    fields           = Dict{AbstractString,AbstractString}()
     field_name       = ""
     key              = ""
     publication_type = ""
@@ -125,5 +127,5 @@ const context = Automa.CodeGenContext()
 end
 
 function parse_file(path::AbstractString)
-    return parse(open(x->read(x, String), path))
+    return parse(open(x -> read(x, String), path))
 end
