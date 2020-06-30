@@ -1,4 +1,15 @@
-using BibInternal.BibTeX
+module BibTeX
+
+# Import Automa.jl package to create the Finite-State Machine of the BibTeX grammar
+import Automa
+import Automa.RegExp: @re_str
+
+using BibInternal, BibInternal.BibTeX
+
+export parse, parse_file
+
+# Define the notation for RegExp in Automa.jl
+const re = Automa.RegExp
 
 # Concatenation with spaces: \times (tab completion)
 × = (x::re.RE, y::re.RE) -> x * re.rep(re"[\t\n\r ]") * y
@@ -60,7 +71,7 @@ end
 
 # Generate actions for the FSM
 const bibtex_actions = Dict(
-    :add_entry          => :(entries[key] = BibInternal.BibTeX.make_bibtex_entry(publication_type, key, fields)),
+    :add_entry          => :(push!(entries, BibInternal.BibTeX.make_bibtex_entry(publication_type, key, fields))),
     :add_field          => :(fields[field_name] = value),
     :brace_in           => :(brace_in = p),
     :brace_out          => :(brace_out = p),
@@ -92,7 +103,7 @@ const context = Automa.CodeGenContext()
 
 @eval function parse(data::AbstractString)
     # Variables to store data
-    entries          = Dict{AbstractString,BibInternal.AbstractEntry}()
+    entries          = Set{BibInternal.AbstractEntry}()
     fields           = Dict{AbstractString,AbstractString}()
     field_name       = ""
     key              = ""
@@ -128,4 +139,6 @@ end
 
 function parse_file(path::AbstractString)
     return parse(open(x -> read(x, String), path))
+end
+
 end

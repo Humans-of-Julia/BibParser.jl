@@ -1,14 +1,13 @@
-using BibParser
-using Automa
+using BibParser, BibParser.BibTeX
 using Test
 
 for file in ["test.bib", "test2.bib"]
     println("\nstart $file")
-    parsed = BibParser.parse_file("../examples/$file")
+    parsed = parse_file("../examples/$file")
 
     println("type: $(typeof(parsed))")
 
-    for e in values(parsed[1])
+    for e in parsed[1]
         println("|--->type: $(typeof(e)), key: $(e.id)")
         for fn in fieldnames(typeof(e))
             println("|     |----$(string(fn)) -> metaprogramming to hard")
