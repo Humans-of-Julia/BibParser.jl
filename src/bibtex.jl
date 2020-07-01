@@ -4,6 +4,9 @@ module BibTeX
 import Automa
 import Automa.RegExp: @re_str
 
+import DataStructures
+import DataStructures.OrderedSet
+
 using BibInternal, BibInternal.BibTeX
 
 export parse, parse_file
@@ -103,7 +106,7 @@ const context = Automa.CodeGenContext()
 
 @eval function parse(data::AbstractString)
     # Variables to store data
-    entries          = Set{BibInternal.AbstractEntry}()
+    entries          = DataStructures.OrderedSet{BibInternal.AbstractEntry}()
     fields           = Dict{AbstractString,AbstractString}()
     field_name       = ""
     key              = ""

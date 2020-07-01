@@ -10,9 +10,7 @@ version = "0.8.0"
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 
 [[BibInternal]]
-git-tree-sha1 = "d7b5b3695dedf0e0b23213c87ff15d5bf090d4ac"
-repo-rev = "master"
-repo-url = "git@github.com:Azzaare/BibInternal.jl.git"
+path = "C:\\Users\\jeanf\\.julia\\dev\\BibInternal"
 uuid = "2027ae74-3657-4b95-ae00-e2f7d55c3e64"
 version = "0.3.0"
 
