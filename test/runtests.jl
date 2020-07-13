@@ -7,12 +7,12 @@ for file in ["test.bib"]
 
     println("type: $(typeof(parsed))")
 
-    for e in parsed[1]
+    for (k,e) in pairs(parsed[1])
         println("|--->type: $(typeof(e)), key: $(e.id)")
         for fn in fieldnames(typeof(e))
-            println("|     |----$(string(fn)) -> metaprogramming to hard") # TODO: better printing
+            println("|     |----$(string(fn)) -> metaprogramming too hard") # TODO: better printing
         end
-        for (n, v) in pairs(e.other)
+        for (n, v) in pairs(e.fields)
             println("|     |----$n -> $v")
         end
         println("|")

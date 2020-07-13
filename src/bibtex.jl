@@ -74,14 +74,14 @@ end
 
 # Generate actions for the FSM
 const bibtex_actions = Dict(
-    :add_entry          => :(push!(entries, BibInternal.BibTeX.make_bibtex_entry(publication_type, key, fields))),
+    :add_entry          => :(entries[key] = BibInternal.BibTeX.make_bibtex_entry(publication_type, key, fields)),
     :add_field          => :(fields[field_name] = value),
     :brace_in           => :(brace_in = p),
     :brace_out          => :(brace_out = p),
     :brace_value        => :(in_braces == 0 && !in_quotes ? value *= data[brace_in + 1:brace_out - 2] : ()),
     :clean_counters     => :(in_quotes ? () : in_braces = 0),
     :clean_field        => :(value = ""),
-    :clean_entry        => :(fields = Dict{AbstractString,AbstractString}()),
+    :clean_entry        => :(fields = Dict{String,String}()),
     :dec_braces         => :(in_braces -= 1),
     :field_name         => :(field_name = lowercase(data[mark_in:mark_out - 1])),
     :in_quotes          => :(in_braces == 0 ? in_quotes = !in_quotes : ()),
@@ -104,10 +104,10 @@ const bibtex_actions = Dict(
 
 const context = Automa.CodeGenContext()
 
-@eval function parse(data::AbstractString)
+@eval function parse(data::String)
     # Variables to store data
-    entries          = DataStructures.OrderedSet{BibInternal.AbstractEntry}()
-    fields           = Dict{AbstractString,AbstractString}()
+    entries          = DataStructures.OrderedDict{String, BibInternal.AbstractEntry}()
+    fields           = Dict{String,String}()
     field_name       = ""
     key              = ""
     publication_type = ""
@@ -140,7 +140,7 @@ const context = Automa.CodeGenContext()
     return entries, cs == 0 ? :ok : cs < 0 ? :error : :incomplete
 end
 
-function parse_file(path::AbstractString)
+function parse_file(path::String)
     return parse(open(x -> read(x, String), path))
 end
 
