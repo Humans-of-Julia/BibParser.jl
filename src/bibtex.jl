@@ -1,147 +1,184 @@
-module BibTeX
-
-# Import Automa.jl package to create the Finite-State Machine of the BibTeX grammar
-import Automa
-import Automa.RegExp: @re_str
+module BibTeXParser
 
 import DataStructures
 import DataStructures.OrderedSet
 
-using BibInternal, BibInternal.BibTeX
+import BibInternal, BibInternal.BibTeX
 
-export parse, parse_file
+export parse_bibtex_file
 
-# Define the notation for RegExp in Automa.jl
-const re = Automa.RegExp
-
-# Concatenation with spaces: \times (tab completion)
-× = (x::re.RE, y::re.RE) -> x * re.rep(re"[\t\n\r ]") * y
-
-const machine = (
-    function () # Grammar
-    # Basic regexp
-    publication_type    = re"@[A-Za-z]+"
-    field_name          = re"[A-Za-z]+"
-    in_braces           = re"[^@{}]"
-    in_quotes           = re.neg(re"\"")
-    key                 = re"[A-Za-z][0-9A-Za-z_:/\-]*"
-    left_brace          = re"{"
-    number              = re"[0-9]+"
-    quotes              = re"\""
-    right_brace         = re"}"
-    space               = re"[\t\n\r ]"
-
-    # Complex regexp
-    brace_value     = left_brace * re.rep(in_braces | left_brace | right_brace) * right_brace
-    quote_value     = quotes * re.rep(brace_value | in_quotes) * quotes
-    value           = number | quote_value | brace_value
-    field_value     = re.rep(value × re"#") × value    
-    field           = field_name × re"=" × field_value
-    fields          = re.rep(re"," × field)    
-    entry_content   = key × fields × re.opt(re",")
-    brace_entry     = left_brace × entry_content × right_brace
-    publication     = publication_type × brace_entry 
-    bibliography    = re.rep(space | publication)
-
-
-    # RegExp/States Actions
-    brace_value.actions[:enter]         = [:brace_in]
-    brace_value.actions[:exit]          = [:brace_out, :brace_value]
-    # field.actions[:enter]               = [:print_info]
-    # field.actions[:exit]                = [:print_field]    
-    field.actions[:exit]                = [:add_field]
-    field_name.actions[:enter]          = [:mark_in]
-    field_name.actions[:exit]           = [:mark_out, :field_name]
-    field_value.actions[:enter]         = [:clean_field]
-    key.actions[:enter]                 = [:mark_in]
-    key.actions[:exit]                  = [:mark_out, :key]
-    left_brace.actions[:exit]           = [:inc_braces]
-    number.actions[:enter]              = [:number_in]
-    number.actions[:exit]               = [:number_out, :number_value]
-    publication.actions[:enter]         = [:clean_entry]
-    publication.actions[:exit]          = [:add_entry]
-    publication_type.actions[:enter]    = [:mark_in]
-    publication_type.actions[:exit]     = [:mark_out, :publication_type]
-    quote_value.actions[:enter]         = [:quote_in]
-    quote_value.actions[:exit]          = [:quote_out, :quote_value]
-    quotes.actions[:enter]              = [:in_quotes]
-    right_brace.actions[:enter]         = [:dec_braces]
-    value.actions[:enter]               = [:clean_counters]
-
-    return Automa.compile(bibliography)
-end
-)()
-
-# Generate actions for the FSM
-const bibtex_actions = Dict(
-    :add_entry          => :(entries[key] = BibInternal.BibTeX.make_bibtex_entry(publication_type, key, fields)),
-    :add_field          => :(fields[field_name] = value),
-    :brace_in           => :(brace_in = p),
-    :brace_out          => :(brace_out = p),
-    :brace_value        => :(in_braces == 0 && !in_quotes ? value *= data[brace_in + 1:brace_out - 2] : ()),
-    :clean_counters     => :(in_quotes ? () : in_braces = 0),
-    :clean_field        => :(value = ""),
-    :clean_entry        => :(fields = Dict{String,String}()),
-    :dec_braces         => :(in_braces -= 1),
-    :field_name         => :(field_name = lowercase(data[mark_in:mark_out - 1])),
-    :in_quotes          => :(in_braces == 0 ? in_quotes = !in_quotes : ()),
-    :inc_braces         => :(in_braces += 1),
-    :key                => :(key = data[mark_in:mark_out - 1]),
-    :mark_in            => :(mark_in = p),
-    :mark_out           => :(mark_out = p),
-    :number_in          => :(number_in = p),
-    :number_out         => :(number_out = p),
-    :number_value       => :(value *= data[number_in:number_out - 1]),
-    # TODO: why is the value == "" necessary (debug)
-    # TODO: bug with }} when the second brace is to close the entry
-    # :print_field        => :(println(value == "" ? "field: $field_name = \"\"" : "field: $field_name = $value")),
-    # :print_info         => :(println("info: $(data[1:p - 1])")),
-    :publication_type   => :(publication_type = lowercase(data[mark_in + 1:mark_out - 1])),
-    :quote_in           => :(quote_in = p),
-    :quote_out          => :(quote_out = p),
-    :quote_value        => :(in_braces == 0 ? value *= data[quote_in + 1:quote_out - 2] : ()),
-)
-
-const context = Automa.CodeGenContext()
-
-@eval function parse(data::String)
-    # Variables to store data
-    entries          = DataStructures.OrderedDict{String, BibInternal.AbstractEntry}()
-    fields           = Dict{String,String}()
-    field_name       = ""
-    key              = ""
-    publication_type = ""
-    value            = ""
-
-    # Marks where to extract strings 
-    mark_in          = 0
-    mark_out         = 0
-    brace_in         = 0
-    brace_out        = 0
-    quote_in         = 0
-    quote_out        = 0
-    number_in        = 0
-    number_out       = 0
-
-    # Counting braces, and marking in quotes field values
-    in_quotes        = false
-    in_braces        = 0 # left braces increment by one, right ones decrement
-
-    # generate code to initialize variables used by FSM
-    $(Automa.generate_init_code(context, machine))
-
-    # set end and EOF positions of data buffer
-    p_end = p_eof = sizeof(data)
-
-    # generate code to execute FSM
-    $(Automa.generate_exec_code(context, machine, bibtex_actions))
-
-    # check if FSM properly finished and returm the state of the FSM
-    return entries, cs == 0 ? :ok : cs < 0 ? :error : :incomplete
+struct Parser{T}
+    tokens::T
+    substitutions::Dict{String, String}
+    records::Dict{String, Dict{String, String}}
+    line::Ref{Int}
 end
 
-function parse_file(path::String)
-    return parse(open(x -> read(x, String), path))
+Base.eltype(p::Parser) = eltype(p.tokens)
+Base.one(p::Parser) = eltype(p)("")
+
+Parser(tokens::T, substitutions, records, line) where T =
+    Parser{T}(tokens, substitutions, records, line)
+
+parse_text(text) = begin
+    tokens = collect(m.match for m in eachmatch(r"[^\s\n\"#{}@,=]+|\n|\"|#|{|}|@|,|=", text))
+    Parser(tokens, Dict{String, String}(), Dict{String, String}(), Ref(1))
+end
+
+location(parser) = "on line $(parser.line.x)"
+
+next_token_default!(parser) =
+    if isempty(parser.tokens)
+        one(parser)
+    else
+        result = popfirst!(parser.tokens)
+        if result == "\n"
+            parser.line.x = parser.line.x + 1
+            next_token_default!(parser)
+        else
+            result
+        end
+    end
+
+next_token!(parser, eol = "additional tokens") = begin
+    result = next_token_default!(parser)
+    if result == ""
+        error("Expected $eol $(location(parser))")
+    else
+        result
+    end
+end
+
+expect(parser, result, expectation) =
+    if result != expectation
+        error("Expected $expectation $(location(parser))")
+    end
+
+expect!(parser, expectation) = expect(parser, next_token!(parser, expectation), expectation)
+
+token_and_counter!(parser, bracket_counter = 1) = begin
+    token = next_token!(parser, "}")
+    if token == "{"
+        bracket_counter += 1
+    elseif token == "}"
+        bracket_counter -= 1
+    end
+    token, bracket_counter
+end
+
+value!(parser, values = eltype(parser)[]) = begin
+    token = next_token!(parser)
+    if token == "\""
+        token = next_token!(parser, "\"")
+        while token != "\""
+            push!(values, token)
+            token = next_token!(parser, "\"")
+        end
+    elseif token == "{"
+        token, counter = token_and_counter!(parser)
+        while counter > 0
+            push!(values, token)
+            token, counter = token_and_counter!(parser, counter)
+        end
+    else
+        push!(values, getkey(parser.substitutions, token, String(token) ) )
+    end
+    token = next_token!(parser, ", or }")
+    if token == "#"
+        value!(parser, values)
+    else
+        token, join(values, " ")
+    end
+end
+
+field!(parser, dict) = begin
+    token = ","
+    while token == ","
+        token = next_token!(parser, "a new entry or }")
+        if token != "}"
+            key = token
+            expect!(parser, "=")
+            token, dict[key] = value!(parser)
+        end
+    end
+    expect(parser, token, "}")
+end
+
+export parse_bibtex
+"""
+    parse_bibtex(text)
+This is a simple input parser for BibTex. I had trouble finding a standard
+specification, but I've included several features of real BibTex. Returns
+a preamble (or an empty string) and a dict of dicts.
+```jldoctest
+julia> using BibTeX
+julia> preamble, result = parse_bibtex(""\"
+            @preamble{some instructions}
+            @comment blah blah
+            @string{short = long}
+            @a{b,
+              c = { {c} c},
+              d = "d d",
+              e = f # short
+            }
+            ""\");
+julia> preamble
+"some instructions"
+julia> result["b"]["type"]
+"a"
+julia> result["b"]["c"]
+"{ c } c"
+julia> result["b"]["d"]
+"d d"
+julia> result["b"]["e"]
+"f short"
+julia> parse_bibtex("@book")
+ERROR: Expected { on line 1
+[...]
+julia> parse_bibtex("@book@")
+ERROR: Expected { on line 1
+[...]
+```
+"""
+parse_bibtex(text) = begin
+    parser = parse_text(text)
+    token = next_token_default!(parser)
+    preamble = ""
+    while token != ""
+        if token == "@"
+            record_type = lowercase(next_token!(parser))
+            if record_type == "preamble"
+                trash, preamble = value!(parser)
+            elseif record_type != "comment"
+                expect!(parser, "{")
+                if record_type == "string"
+                    field!(parser, parser.substitutions)
+                else
+                    id = next_token!(parser)
+                    dict = Dict("type" => record_type)
+                    expect!(parser, ",")
+                    field!(parser, dict)
+                    parser.records[id] = dict
+                end
+            end
+        end
+        token = next_token_default!(parser)
+    end
+    preamble, parser.records
+end
+
+
+function parse_bibtex_file(path::String)
+    bib = parse_bibtex(read(path, String))
+    entries = DataStructures.OrderedDict{String, BibInternal.AbstractEntry}()
+
+    for (id, fields) in collect(bib[2])
+        type = fields["type"]
+        delete!(fields, "type")
+        entries[id] = BibInternal.BibTeX.make_bibtex_entry(type, id, fields)
+    end
+
+    return entries
 end
 
 end
