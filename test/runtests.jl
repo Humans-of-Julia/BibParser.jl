@@ -1,14 +1,12 @@
-using BibParser, BibParser.BibTeXParser
+using BibParser, BibParser.BibTeX
 using Test
 
 for file in ["test.bib"]
     println("\nstart $file")
     parsed = parse_file("../examples/$file")
 
-    println("type: $(typeof(parsed))")
-
     for (k,e) in pairs(parsed)
-        println("|--->type: $(typeof(e)), key: $(e.id)")
+        println("|--->$(e.id)")
         for fn in fieldnames(typeof(e))
             println("|     |----$(string(fn)) -> metaprogramming too hard") # TODO: better printing
         end

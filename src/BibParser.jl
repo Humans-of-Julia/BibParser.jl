@@ -2,15 +2,15 @@ module BibParser
 
 export parse_file
 
-
-
 # BibTeX module
 include("bibtex.jl")
 
-import .BibTeXParser
+import .BibTeX
 
 function parse_file(path::String; parser::Symbol = :BibTeX)
-    BibTeXParser.parse_bibtex_file(path)
+    if parser == :BibTeX
+        BibTeX.parse_file(path)
+    end
 end
 
 include("precompile.jl")

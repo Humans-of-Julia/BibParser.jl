@@ -1,11 +1,9 @@
-module BibTeXParser
+module BibTeX
 
 import DataStructures
 import DataStructures.OrderedSet
 
-import BibInternal, BibInternal.BibTeX
-
-export parse_bibtex_file
+import BibInternal
 
 struct Parser{T}
     tokens::T
@@ -167,17 +165,14 @@ parse_bibtex(text) = begin
     preamble, parser.records
 end
 
-
-function parse_bibtex_file(path::String)
+function parse_file(path::String)
     bib = parse_bibtex(read(path, String))
-    entries = DataStructures.OrderedDict{String, BibInternal.AbstractEntry}()
+    entries = DataStructures.OrderedDict{String, BibInternal.Entry}()
+    errors = Vector{Pair{String, BibInternal.Required}}()
 
     for (id, fields) in collect(bib[2])
-        type = fields["type"]
-        delete!(fields, "type")
-        entries[id] = BibInternal.BibTeX.make_bibtex_entry(type, id, fields)
+        e = entries[id] = BibInternal.make_bibtex_entry(id, fields)
     end
-
     return entries
 end
 
