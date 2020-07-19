@@ -1,7 +1,7 @@
 name = "BibParser"
 uuid = "13533e5b-e1c2-4e57-8cef-cac5e52f6474"
 authors = ["azzaare <jf@baffier.fr>"]
-version = "0.1.4"
+version = "0.1.5"
 
 [deps]
 Automa = "67c07d97-cdcb-5c2c-af73-a7f9c32a568b"
