@@ -20,7 +20,7 @@ Parser(tokens::T, substitutions, records, line) where T =
 
 parse_text(text) = begin
     tokens = collect(m.match for m in eachmatch(r"[^\s\n\"#{}@,=]+|\n|\"|#|{|}|@|,|=", text))
-    Parser(tokens, Dict{String, String}(), Dict{String, String}(), Ref(1))
+    Parser(tokens, Dict{String, String}(), OrderedDict{String, String}(), Ref(1))
 end
 
 location(parser) = "on line $(parser.line.x)"
