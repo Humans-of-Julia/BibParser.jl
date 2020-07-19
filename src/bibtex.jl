@@ -1,14 +1,14 @@
 module BibTeX
 
 import DataStructures
-import DataStructures.OrderedSet
+import DataStructures.OrderedSet, DataStructures.OrderedDict
 
 import BibInternal
 
 struct Parser{T}
     tokens::T
     substitutions::Dict{String, String}
-    records::Dict{String, Dict{String, String}}
+    records::OrderedDict{String, Dict{String, String}}
     line::Ref{Int}
 end
 
