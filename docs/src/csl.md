@@ -2,6 +2,6 @@
 ```
 
 ```@autodocs
-Modules = [BibParser]
+Modules = [BibParser.CSL]
 Pages   = ["csl.jl"]
 ```

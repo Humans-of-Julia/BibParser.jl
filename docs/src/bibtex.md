@@ -2,6 +2,6 @@
 ```
 
 ```@autodocs
-Modules = [BibParser]
+Modules = [BibParser.BibTeX]
 Pages   = ["bibtex.jl"]
 ```

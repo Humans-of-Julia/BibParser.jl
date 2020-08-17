@@ -9,7 +9,7 @@ makedocs(
     pages = [
         "BibParser" => "index.md",
         "BibTeX" => "bibtex.md",
-        "BibTeX - automa" => "bibtex_automa.md",
+        # "BibTeX - automa" => "bibtex_automa.md",
         "CSL-JSON" => "csl.md",
         "Internal" => "internal.md",
     ]
