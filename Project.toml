@@ -10,6 +10,6 @@ DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 
 [compat]
 Automa = "^0.8"
-BibInternal = "^0.2.1"
+BibInternal = "^0.2.2"
 DataStructures = "^0.17.19"
 julia = "^1.4"
