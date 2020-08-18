@@ -20,6 +20,16 @@ function parse_file(path::String; parser::Symbol = :BibTeX)
     end
 end
 
+"""
+    parse_entry(entry::String; parser::Symbol = :BibTeX)
+Parse a string entry. Default to BibTeX format. No other options available yet (CSL-JSON coming soon).
+"""
+function parse_entry(entry::String; parser::Symbol = :BibTeX)
+    if parser == :BibTeX
+        BibTeX.parse_bibtex(entry)
+    end
+end
+
 include("precompile.jl")
 _precompile_()
 
