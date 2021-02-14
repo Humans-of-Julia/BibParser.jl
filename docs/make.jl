@@ -3,6 +3,7 @@ using Documenter, BibParser, BibInternal
 makedocs(
     sitename = "BibParser.jl",
     authors = "Jean-François BAFFIER",
+    repo="https://github.com/Humans-of-Julia/BibParser.jl/blob/{commit}{path}#L{line}",
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true"
     ),
@@ -15,6 +16,4 @@ makedocs(
     ]
 )
 
-deploydocs(
-    repo = "github.com/Azzaare/BibParser.jl.git"
-)
+deploydocs(; repo = "github.com/Humans-of-Julia/BibParser.jl.git", devbranch = "master")
