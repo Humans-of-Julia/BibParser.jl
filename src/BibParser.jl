@@ -30,7 +30,4 @@ function parse_entry(entry::String; parser::Symbol = :BibTeX)
     end
 end
 
-include("precompile.jl")
-_precompile_()
-
 end # module

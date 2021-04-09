@@ -35,12 +35,12 @@ const machine = (
     brace_value     = left_brace * re.rep(in_braces | left_brace | right_brace) * right_brace
     quote_value     = quotes * re.rep(brace_value | in_quotes) * quotes
     value           = number | quote_value | brace_value
-    field_value     = re.rep(value × re"#") × value    
+    field_value     = re.rep(value × re"#") × value
     field           = field_name × re"=" × field_value
-    fields          = re.rep(re"," × field)    
+    fields          = re.rep(re"," × field)
     entry_content   = key × fields × re.opt(re",")
     brace_entry     = left_brace × entry_content × right_brace
-    publication     = publication_type × brace_entry 
+    publication     = publication_type × brace_entry
     bibliography    = re.rep(space | publication)
 
 
@@ -48,7 +48,7 @@ const machine = (
     brace_value.actions[:enter]         = [:brace_in]
     brace_value.actions[:exit]          = [:brace_out, :brace_value]
     # field.actions[:enter]               = [:print_info]
-    # field.actions[:exit]                = [:print_field]    
+    # field.actions[:exit]                = [:print_field]
     field.actions[:exit]                = [:add_field]
     field_name.actions[:enter]          = [:mark_in]
     field_name.actions[:exit]           = [:mark_out, :field_name]
