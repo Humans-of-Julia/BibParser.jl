@@ -2,6 +2,8 @@ module BibParser
 
 export parse_file
 
+include("utils.jl")
+
 # BibTeX module
 include("bibtex.jl")
 import .BibTeX

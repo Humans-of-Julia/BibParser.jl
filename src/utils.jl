@@ -1,0 +1,1 @@
+Base.iszero(t::Tuple) = iszero(t[1]) && iszero(t[2])

@@ -7,6 +7,7 @@ version = "0.1.10"
 BibInternal = "2027ae74-3657-4b95-ae00-e2f7d55c3e64"
 CombinedParsers = "5ae71ed2-6f8a-4ed1-b94f-e14e8158f19e"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+TextParse = "e0df1984-e451-5cb5-8b61-797a481e67e3"
 
 [compat]
 BibInternal = "0.2"
