@@ -2,6 +2,8 @@ module BibParser
 
 export parse_file
 
+include("utils.jl")
+
 # BibTeX module
 include("bibtex.jl")
 import .BibTeX
@@ -29,8 +31,5 @@ function parse_entry(entry::String; parser::Symbol = :BibTeX)
         BibTeX.parse_bibtex(entry)
     end
 end
-
-include("precompile.jl")
-_precompile_()
 
 end # module

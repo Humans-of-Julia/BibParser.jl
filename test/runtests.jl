@@ -15,6 +15,4 @@ for file in ["test.bib"]
         end
         println("|")
     end
-    # @test parsed[2] == :ok
 end
-
