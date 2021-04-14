@@ -1,201 +1,407 @@
 module BibTeX
 
-using CombinedParsers
-using CombinedParsers.Regexp
-using TextParse
+using DataStructures
+using BibInternal
 
-# Concatenation with spaces: \times (tab completion)
-× = (x, y) -> x * Repeat(re"[\t\n\r ]") * y
+export parse_string
 
-# Basic regexp
-publication_type = re"@[a-z]+"i
-field_name = re"[a-z]+"i
-in_braces = re"[^@{}]"
-in_quotes = re"[^\"]"
-key = re"[a-z][0-9a-z_:/\-\\]*"i
-left_brace = re"\{"
-number = re"[0-9]+"
-quotes = re"\""
-right_brace = re"\}"
-space = re"[\t\n\r ]"
-
-# Complex regexp
-brace_value = left_brace * Repeat(in_braces | left_brace | right_brace) * right_brace
-quote_value = quotes * Repeat(brace_value | in_quotes) * quotes
-value = number | quote_value | brace_value
-field_value = Repeat(value × re"#") × value
-field = field_name × re"=" × field_value
-fields = Repeat(re"," × field)
-entry_content = key × fields × Optional(re",")
-brace_entry = left_brace × entry_content × right_brace
-publication = publication_type × brace_entry
-bibliography = Repeat(space | publication)
-
-@enum Kind begin
-    AT # '@'
-    COMA # ','
-    QUOTE # '"'
-    LEFT_BRACE # '{'
-    RIGHT_BRACE # '}'
-    LEFT_PARENTHESIS # '('
-    RIGHT_PARENTHESIS # ')'
-    CONCAT # '#'
-    NEW_LINE # '\n' # TODO: is \r useful?
-
-    ENTRY # for error log
-    PREAMBLE # preamble entry
-    COMMENT_ENTRY # comment entry
-    STRING_ENTRY # string entry
-    COMMENT_TEXT # free text
-    PUBLICATION # type of a publication
-
-    KEY # article key
-    FIELD_NAME # field name
-    FIELD_VALUE # field value (quoted, braced, number, or var_string)
+mutable struct Accumulator
+    from::Int
+    to::Int
 end
 
-struct Token
-    kind::Kind
-    # Offsets into a string or buffer
-    startpos::Tuple{Int, Int} # row, col where token starts /end, col is a string index
-    endpos::Tuple{Int, Int}
-    # startbyte::Int # The byte where the token start in the buffer
-    # endbyte::Int # The byte where the token ended in the buffer
-    val::String # The actual string of the token
-    # token_error::TokenError
-    # dotop::Bool
-    # suffix::Bool
-    delim::Union{Char, Nothing}
+struct Content
+    # comments::Dict{Int, String}
+    entries::OrderedDict{String,BibInternal.Entry}
+    # free::Dict{Int, String}
+    # preambles::Dict{Int, String}
+    strings::Dict{String,String}
 end
 
-mutable struct Tokenizer
-    tokens::Vector{Token}
-    acc::String
-    startpos::Tuple{Int, Int}
-    endpos::Tuple{Int, Int}
+function Content()
+    # comments = Dict{Int, String}()
+    entries = OrderedDict{String,BibInternal.Entry}()
+    # free = Dict{Int, String}()
+    # preambles = Dict{Int, String}()
+    strings = Dict{String,String}()
+    return Content(entries, strings)
+end
+
+mutable struct Field
+    braces::Int
+    name::String
+    quotes::Bool
+    value::String
+
+    Field() = new(0, "", false, "")
+end
+
+
+mutable struct Position
     row::Int
     col::Int
-    delim::Union{Char, Nothing}
-    counter::Int
-    level::Symbol
-    parent_level::Symbol
-    vars::Dict{String, String}
 end
 
-function Token(t, kind; delim = nothing)
-    Token(kind, get_start(t), get_end(t), get_acc(t), delim)
+Position() = Position(0, 0)
+
+mutable struct Storage
+    delim::Union{Char,Nothing}
+    fields::Vector{Field}
+    key::String
+    kind::String
 end
 
-get_tokens(t) = t.tokens
-get_acc(t) = t.acc
-get_start(t) = t.startpos
-get_end(t) = t.endpos
-get_row(t) = t.row
-get_col(t) = t.col
-get_delim(t) = t.delim
-get_count(t) = t.counter
-get_level(t) = t.level
-get_parent(t) = t.parent_level
+Storage() = Storage(nothing, Vector{Field}(), "", "")
 
-inc_acc!(t, char) = t.acc *= char
-reset_acc!(t) = t.acc = ""
-set_start!(t, startpos) = t.startpos = startpos
-set_end!(t, endpos) = t.endpos = endpos
-function inc_row!(t)
-    t.row += 1
-    t.col = 1
-end
-inc_col!(t) = t.col += 1
-set_delim!(t, char) = t.delim = char
-inc_count!(t) = t.counter += 1
-dec_count!(t) = t.counter -= 1
-set_level!(t, level) = t.level = level
-set_parent!(t, level) = t.parent_level = level
-reset_parent!(t) = set_parent!(t, :top)
-
-is_acc_empty(t) = isempty(get_acc(t))
-
-Base.push!(t::Tokenizer, token) = push!(get_tokens(t), token)
-
-function tokenize!(t, char, ::Val{:preamble})
-    set_level!(t, :value)
-    set_parent!(t, :preamble)
-    push!(t, Token(PREAMBLE, t; delim = get_delim(t)))
-    tokenize!(t, char, Val(:value))
+function make_entry(storage)
+    # @info "making entry" storage
+    d = Dict("type" => storage.kind)
+    foreach(field -> push!(d, field.name => field.value), storage.fields)
+    return d
 end
 
-function tokenize!(t, char, ::Val{:comment})
-    if char ∉ [get_delim(t), '@']
-        inc_acc!(t, char)
-    else
-        if char == '@'
-            push!(t, Token(COMMENT_TEXT, t))
-            set_level!(t, :entry)
-        else
-            push!(t, Token(COMMENT_ENTRY, t))
-            set_level!(t, :free)
-        end
-        reset_acc!(t)
-        set_start!(t, (row, col))
-        set_parent!(t, :top)
-    end
-end
+mutable struct Parser
+    acc::Accumulator
+    content::Content
+    field::Field
+    input::Vector{Char}
+    pos_start::Position
+    pos_end::Position
+    storage::Storage
+    task::Symbol
 
-function tokenize!(t, char, ::Val{:entry})
-    if char ∈ ['(', '{'] && !is_acc_empty(t)
-        _type = lowercase(get_acc(t))
-        push!(t, Token(ENTRY, t; delim = '{'))
-        reset_acc!(t)
-        set_start!(t, (row, col))
-        set_level!(t, _type ∈ ["comment", "preamble", "string"] ? Symbol(_type) : :key)
-        set_parent!(t, _type ∈ ["comment", "preamble", "string"] ? Symbol(_type) : :entry)
-        set_delim!(t, char)
-    elseif occursin(r"[a-zA-Z]+", string(char))
-        inc_acc!(t, char)
-    else
-        set_level!(t, :free)
-        @warn "Error: uncorrect entry type at line $row character $col in the entry starting at line $(startpos[1]) character $(startpos[2])."
-    end
-end
-
-function tokenize!(t, char, ::Val{:free})
-    if char != '@'
-        inc_acc!(t, char)
-    else
-        push!(t, Token(COMMENT_TEXT, t))
-        reset_acc!(t)
-        set_start!(t, (row, col))
-        set_level!(t, :entry)
-    end
-end
-
-function inc!(t, char)
-    set_end!(t, (get_row(t), get_col(t)))
-    char == '\n' ? inc_row!(t) : inc_col!(t)
-end
-
-function tokenize!(t, char)
-    inc!(t, char)
-    tokenize!(t, char, Val(get_level(t)))
-end
-
-function tokenize(str)
-    t = Tokenizer(
-        Vector{Token}(),
-        "", # character accumulator
-        (1, 1), # start position
-        (0, 0), # end position (non init)
-        row, # row
-        col, # column
-        delim, # entry delimiter
-        counter, # brace counter
-        :free, # start at free text level
-        :top, # parent level of :free is :top
-        Dict{String, String}()
+    function Parser(input;
+        acc=Accumulator(1, 0),
+        content=Content(),
+        field=Field(),
+        pos_start=Position(1, 1),
+        pos_end=Position(1, 0),
+        storage=Storage(),
+        task=:free,
     )
-    foreach(char -> tokenize!(t, char), str)
-    get_level(t) == :free && push!(get_tokens(t), Token(COMMENT_TEXT, t))
-    return tokens
+        new(acc, content, field, collect(input), pos_start, pos_end, storage, task)
+    end
 end
 
+rev(char) = char == '(' ? ')' : '}'
+
+get_entries(parser) = parser.content.entries
+function get_acc(parser; from = 1, to = 0)
+    a = from + parser.acc.from - 1
+    b = parser.acc.to - to
+    return prod(parser.input[a:b])
 end
+
+set_delim!(parser, char) = parser.storage.delim = char
+set_entry_kind!(parser, kind) = parser.storage.kind = kind
+
+inc_col!(t) = t.pos_end.col += 1
+function inc_row!(t)
+    t.pos_end.row += 1
+    t.pos_end.col = 1
+end
+
+function inc!(t, char, dumped)
+    char == '\n' ? inc_row!(t) : inc_col!(t)
+    t.acc.to += 1
+    if dumped
+        t.pos_start = t.pos_end
+        t.acc.from = t.acc.to
+    end
+end
+
+is_dumped(parser, char, ::Val{:free}) = char == '@'
+dump!(parser, char, ::Val) = char == '@' && (parser.task = :entry)
+
+is_dumped(parser, char, ::Val{:entry}) = occursin(r"[@{\(\n]", char)
+function dump!(parser, char, ::Val{:entry})
+    if char == '\n'
+        parser.task = :free
+    elseif char ∈ ['{', '(']
+        set_delim!(parser, char)
+        acc = split(lowercase(get_acc(parser; from = 2)), r"[\t ]+")
+        if length(acc) ≤ 2 && !isempty(acc[1])
+            set_entry_kind!(parser, acc[1])
+            parser.task = acc[1] ∈ ["comment", "preamble", "string"] ? Symbol(acc[1]) : :key
+        else
+            parser.task = :free
+        end
+    end
+end
+
+is_dumped(parser, char, ::Val{:key}) = char ∈ ['@', ',']
+function dump!(parser, char, ::Val{:key})
+    if char == '@'
+        parser.task = :entry
+    elseif char == ','
+        acc = split(get_acc(parser; from = 2), r"[\t ]+")
+        if length(acc) ≤ 2 && !isempty(acc[1])
+            parser.storage.key = acc[1]
+            parser.task = :field_name
+        else
+            parser.task = :free
+        end
+    end
+end
+
+is_dumped(parser, char, ::Val{:field_name}) = char ∈ ['=', '@']
+function dump!(parser, char, ::Val{:field_name})
+    if char == '@'
+        parser.task = :entry
+    elseif char == '='
+        acc = split(get_acc(parser; from = 2), r"[\t\r\n ]+"; keepempty=false)
+        if length(acc) == 1
+            parser.field.name = acc[1]
+            parser.task = :field_in
+        else
+            parser.task = :free
+        end
+    end
+end
+
+is_dumped(parser, char, ::Val{:field_in}) = occursin(r"[0-9@a-zA-Z\"{]", char)
+function dump!(parser, char, ::Val{:field_in})
+    if char == '@'
+        parser.task = :entry
+    elseif char == '"'
+        parser.pos_start.col += 1
+        parser.acc.from += 1
+        parser.task = :field_inquote
+    elseif char == '{'
+        parser.task = :field_inbrace
+    elseif occursin(r"[0-9]", char)
+        parser.task = :field_number
+    elseif occursin(r"[a-zA-Z]", char)
+        parser.task = :field_var
+    end
+end
+
+is_dumped(parser, char, ::Val{:field_inbrace}) = char ∈ ['@', '}']
+function dump!(parser, char, ::Val{:field_inbrace})
+    if char == '@'
+        parser.task = :entry
+    elseif char == '}'
+        parser.field.value = get_acc(parser; from = 2)
+        push!(parser.storage.fields, deepcopy(parser.field))
+        parser.field.value = ""
+        parser.task = :field_out
+    end
+end
+
+is_dumped(parser, char, ::Val{:field_inquote}) = char ∈ ['{', '"', '}']
+function dump!(parser, char, ::Val{:field_inquote})
+    if char == '"' && parser.field.braces == 0
+        parser.field.value *= get_acc(parser; from = 2)
+        parser.task = :field_outquote
+    elseif char == '{'
+        parser.field.value *= get_acc(parser)# * parser.field.value
+        parser.field.braces += 1
+    elseif char == '}'
+        parser.field.value *= get_acc(parser)# * parser.field.value
+        parser.field.braces -= 1
+    end
+end
+
+function is_dumped(parser, char, ::Val{:field_outquote})
+    return char ∈ ['@', ',', '#', rev(parser.storage.delim)]
+end
+function dump!(parser, char, ::Val{:field_outquote})
+    if char == '@'
+        parser.task = :entry
+    elseif char == '#'
+        parser.task = :field_concat
+    else
+        push!(parser.storage.fields, deepcopy(parser.field))
+        parser.field.value = ""
+        if char == ','
+            parser.task = :field_next
+        elseif char == rev(parser.storage.delim)
+            entry = make_entry(parser.storage)
+            push!(parser.content.entries,
+            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
+            )
+            parser.task = :free
+        end
+    end
+end
+
+is_dumped(parser, char, ::Val{:field_concat}) = occursin(r"[a-zA-Z\"@]", char)
+function dump!(parser, char, ::Val{:field_concat})
+    if char == '@'
+        parser.task = :entry
+    elseif char == '"'
+        parser.pos_start.col += 1
+        parser.acc.from += 1
+        parser.task = :field_inquote
+    elseif occursin(r"[a-zA-Z]", char)
+        parser.task = :field_var
+    end
+end
+
+function is_dumped(parser, char, ::Val{:field_var})
+    return char ∈ ['@', ',', '#', rev(parser.storage.delim)]
+end
+function dump!(parser, char, ::Val{:field_var})
+    if char == '@'
+        parser.task = :entry
+    else
+        acc = split(get_acc(parser), r"[\t\r\n ]+"; keepempty=false)
+        if length(acc) == 1
+            # @info "Printing" parser.content.strings[acc[1]] parser.field.value
+            parser.field.value *= parser.content.strings[acc[1]]
+            if char == '#'
+                parser.task = :field_concat
+            else
+                push!(parser.storage.fields, deepcopy(parser.field))
+                parser.field.value = ""
+                if char == ','
+                    parser.task = :field_next
+                elseif char == rev(parser.storage.delim)
+                    entry = make_entry(parser.storage)
+                    push!(parser.content.entries, parser.storage.key =>
+                        BibInternal.make_bibtex_entry(parser.storage.key, entry)
+                    )
+                    parser.task = :free
+                end
+            end
+        else
+            parser.task = :free
+        end
+    end
+    # @error parser char
+end
+
+is_dumped(parser, char, ::Val{:field_number}) = char ∈ ['@', ',', rev(parser.storage.delim)]
+function dump!(parser, char, ::Val{:field_number})
+    if char == '@'
+        parser.task = :entry
+    else
+        parser.field.value = get_acc(parser)
+        push!(parser.storage.fields, deepcopy(parser.field))
+        parser.field.value = ""
+        if char == ','
+            parser.task = :field_next
+        elseif char == rev(parser.storage.delim)
+            entry = make_entry(parser.storage)
+            push!(parser.content.entries,
+            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
+        )
+            parser.task = :free
+        end
+    end
+end
+
+is_dumped(parser, char, ::Val{:field_out}) = char ∈ ['@', ',', rev(parser.storage.delim)]
+function dump!(parser, char, ::Val{:field_out})
+    if char == '@'
+        parser.task = :entry
+    elseif char == ','
+        parser.task = :field_next
+    elseif char == rev(parser.storage.delim)
+        entry = make_entry(parser.storage)
+        @show entry
+        push!(parser.content.entries,
+            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
+        )
+        parser.task = :free
+    end
+end
+
+is_dumped(parser, char, ::Val{:field_next}) = char ∈ ['=', '@', rev(parser.storage.delim)]
+function dump!(parser, char, ::Val{:field_next})
+    if char == '@'
+        parser.task = :entry
+    elseif char == '='
+        acc = split(get_acc(parser; from = 2), r"[\t\r\n ]+"; keepempty=false)
+        # @show acc
+        if length(acc) == 1
+            parser.field.name = acc[1]
+            parser.task = :field_in
+        else
+            parser.task = :free
+        end
+    elseif char == rev(parser.storage.delim)
+        entry = make_entry(parser.storage)
+        push!(parser.content.entries,
+            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
+        )
+        parser.task = :free
+    end
+end
+
+is_dumped(parser, char, ::Val{:string}) = char ∈ ['=', '@']
+function dump!(parser, char, ::Val{:string})
+    if char == '@'
+        parser.task = :entry
+    elseif char == '='
+        acc = split(get_acc(parser; from = 2), r"[\t\r\n ]+"; keepempty=false)
+        if length(acc) == 1
+            parser.field.name = acc[1]
+            parser.task = :string_inquote
+        else
+            parser.task = :free
+        end
+    else
+        parser.task = :free
+    end
+end
+
+is_dumped(parser, char, ::Val{:string_inquote}) = char ∈ ['"', '@']
+function dump!(parser, char, ::Val{:string_inquote})
+    if char == '@'
+        parser.task = :entry
+    elseif char == '"'
+        parser.task = :string_value
+    end
+end
+
+is_dumped(parser, char, ::Val{:string_value}) = char ∈ ['"']
+function dump!(parser, char, ::Val{:string_value})
+    if char == '"'
+        parser.field.value = get_acc(parser; from = 2)
+        parser.task = :string_outquote
+    end
+end
+
+is_dumped(parser, char, ::Val{:string_outquote}) = char ∈ [rev(parser.storage.delim), '@']
+function dump!(parser, char, ::Val{:string_outquote})
+    if char == '@'
+        parser.task = :entry
+    elseif char == rev(parser.storage.delim)
+        parser.content.strings[parser.field.name] = parser.field.value
+        parser.task = :free
+    end
+end
+
+is_dumped(parser, char) = is_dumped(parser, char, Val(parser.task))
+
+function dump!(parser, char=' ')
+    dump!(parser, char, Val(parser.task))
+    parser.pos_start = parser.pos_end
+    parser.acc.from = parser.acc.to
+end
+
+function parse!(parser, char)
+    dumped = is_dumped(parser, char)
+    dumped && dump!(parser, char)
+    inc!(parser, char, dumped)
+    # fieldout = parser.task == :field_out
+    # dumped && @info parser parser char dumped
+    # dumped && @warn parser.acc parser.content parser.field parser.input parser.pos_start parser.pos_end parser.storage parser.task
+    # @info parser parser char dumped
+    # @warn parser.acc parser.content parser.field parser.input parser.pos_start parser.pos_end parser.storage parser.task
+end
+
+function parse_string(str, ::Val{:bibtex})
+    parser = Parser(str)
+    foreach(char -> parse!(parser, char), parser.input)
+    # @info "Dev: " parser
+    return get_entries(parser)
+end
+
+function parse_file(path::String)
+    entries = parse_string(read(path, String), Val(:bibtex))
+    return entries
+end
+
+end # module
