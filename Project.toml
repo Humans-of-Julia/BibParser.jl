@@ -11,5 +11,6 @@ TextParse = "e0df1984-e451-5cb5-8b61-797a481e67e3"
 
 [compat]
 BibInternal = "0.2"
+CombinedParsers = "0.1"
 DataStructures = "0.18"
 julia = "1.4, 1.5, 1.6"
