@@ -194,10 +194,10 @@ function dump!(parser, char, ::Val{:field_inquote})
         parser.field.value *= get_acc(parser; from = 2)
         parser.task = :field_outquote
     elseif char == '{'
-        parser.field.value *= get_acc(parser)# * parser.field.value
+        parser.field.value *= get_acc(parser; from = 2) # * parser.field.value
         parser.field.braces += 1
     elseif char == '}'
-        parser.field.value *= get_acc(parser)# * parser.field.value
+        parser.field.value *= get_acc(parser; from = 1, to = -1) # * parser.field.value
         parser.field.braces -= 1
     end
 end
@@ -268,24 +268,29 @@ function dump!(parser, char, ::Val{:field_var})
             parser.task = :free
         end
     end
-    # @error parser char
 end
 
-is_dumped(parser, char, ::Val{:field_number}) = char ∈ ['@', ',', rev(parser.storage.delim)]
+is_dumped(parser, char, ::Val{:field_number}) = char ∈ ['@', ',',rev(parser.storage.delim)]
 function dump!(parser, char, ::Val{:field_number})
     if char == '@'
         parser.task = :entry
     else
-        parser.field.value = get_acc(parser)
-        push!(parser.storage.fields, deepcopy(parser.field))
-        parser.field.value = ""
-        if char == ','
-            parser.task = :field_next
-        elseif char == rev(parser.storage.delim)
-            entry = make_entry(parser.storage)
-            push!(parser.content.entries,
-            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
-        )
+        acc = split(get_acc(parser), r"[\t\r\n ]+"; keepempty=false)
+        # @show acc
+        if length(acc) == 1
+            parser.field.value = acc[1]
+            push!(parser.storage.fields, deepcopy(parser.field))
+            parser.field.value = ""
+            if char == ','
+                parser.task = :field_next
+            elseif char == rev(parser.storage.delim)
+                entry = make_entry(parser.storage)
+                push!(parser.content.entries,
+                parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
+                )
+                parser.task = :free
+            end
+        else
             parser.task = :free
         end
     end
