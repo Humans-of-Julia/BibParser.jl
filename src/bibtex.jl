@@ -23,7 +23,20 @@ function Content()
     entries = OrderedDict{String,BibInternal.Entry}()
     # free = Dict{Int, String}()
     # preambles = Dict{Int, String}()
-    strings = Dict{String,String}()
+    strings = Dict{String,String}([
+        "jan" => "January",
+        "feb" => "February",
+        "mar" => "March",
+        "apr" => "April",
+        "may" => "May",
+        "jun" => "June",
+        "jul" => "July",
+        "aug" => "August",
+        "sep" => "September",
+        "oct" => "October",
+        "nov" => "November",
+        "dec" => "December",
+    ])
     return Content(entries, strings)
 end
 
@@ -55,7 +68,7 @@ Storage() = Storage(nothing, Vector{Field}(), "", "")
 
 function make_entry(storage)
     # @info "making entry" storage
-    d = Dict("type" => storage.kind)
+    d = Dict("_type" => storage.kind)
     foreach(field -> push!(d, field.name => field.value), storage.fields)
     return d
 end
@@ -122,7 +135,8 @@ function dump!(parser, char, ::Val{:entry})
         acc = split(lowercase(get_acc(parser; from = 2)), r"[\t ]+")
         if length(acc) ≤ 2 && !isempty(acc[1])
             set_entry_kind!(parser, acc[1])
-            parser.task = acc[1] ∈ ["comment", "preamble", "string"] ? Symbol(acc[1]) : :key
+            # parser.task = acc[1] ∈ ["comment", "preamble", "string"] ? Symbol(acc[1]) : :key
+            parser.task = acc[1] ∈ ["string"] ? Symbol(acc[1]) : :key
         else
             parser.task = :free
         end
@@ -176,15 +190,21 @@ function dump!(parser, char, ::Val{:field_in})
     end
 end
 
-is_dumped(parser, char, ::Val{:field_inbrace}) = char ∈ ['@', '}']
+is_dumped(parser, char, ::Val{:field_inbrace}) = char ∈ ['@', '{', '}']
 function dump!(parser, char, ::Val{:field_inbrace})
     if char == '@'
         parser.task = :entry
-    elseif char == '}'
-        parser.field.value = get_acc(parser; from = 2)
+    elseif char == '}' && parser.field.braces == 0
+        parser.field.value *= get_acc(parser; from = 2)
         push!(parser.storage.fields, deepcopy(parser.field))
         parser.field.value = ""
         parser.task = :field_out
+    elseif char == '{'
+        parser.field.value *= get_acc(parser; from = 2) # * parser.field.value
+        parser.field.braces += 1
+    elseif char == '}'
+        parser.field.value *= get_acc(parser; from = 1, to = -1) # * parser.field.value
+        parser.field.braces -= 1
     end
 end
 
