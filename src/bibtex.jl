@@ -324,7 +324,7 @@ function dump!(parser, char, ::Val{:field_out})
         parser.task = :field_next
     elseif char == rev(parser.storage.delim)
         entry = make_entry(parser.storage)
-        @show entry
+        # @show entry
         push!(parser.content.entries,
             parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
         )

@@ -8,7 +8,7 @@ for file in ["test.bib"]
     for (k,e) in pairs(parsed)
         println("|--->$(e.id)")
         for fn in fieldnames(typeof(e))
-            println("|     |----$(string(fn)) -> metaprogramming too hard") # TODO: better printing
+            println("|     |----$(string(fn)) -> parsed!") # TODO: better printing
         end
         for (n, v) in pairs(e.fields)
             println("|     |----$n -> $v")
