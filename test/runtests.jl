@@ -1,7 +1,7 @@
 using BibParser, BibParser.BibTeX
 using Test
 
-for file in ["test.bib"]
+for file in ["test.bib", "error.bib"]
     println("\nstart $file")
     parsed = parse_file("../examples/$file")
 
