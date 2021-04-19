@@ -79,13 +79,49 @@ struct BibTeXError
     start::Position
     stop::Position
 
-    BibTeXError(k, i, sta, sto) = new(k, i, deepcopy(sta), deepcopy(sto))
+    BibTeXError(k, i, sta, sto) = new(k, "'" * strip(i) * "'", deepcopy(sta), deepcopy(sto))
 end
 
 function warn(error, ::Val)
     row_start, col_start = error.start.row, error.start.col
     row_stop, col_stop = error.stop.row, error.stop.col
     str = "The entry kind is invalid from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+end
+
+function warn(error, ::Val{:invalid_string})
+    row_start, col_start = error.start.row, error.start.col
+    row_stop, col_stop = error.stop.row, error.stop.col
+    str = "The string entry is invalid from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+end
+
+function warn(error, ::Val{:incomplete_entry})
+    row_start, col_start = error.start.row, error.start.col
+    row_stop, col_stop = error.stop.row, error.stop.col
+    str = "The entry is incomplete and end from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+end
+
+function warn(error, ::Val{:invalid_key})
+    row_start, col_start = error.start.row, error.start.col
+    row_stop, col_stop = error.stop.row, error.stop.col
+    str = "The entry key is invalid from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+end
+
+function warn(error, ::Val{:invalid_field_name})
+    row_start, col_start = error.start.row, error.start.col
+    row_stop, col_stop = error.stop.row, error.stop.col
+    str = "The field name is invalid from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+end
+
+function warn(error, ::Val{:invalid_field_number})
+    row_start, col_start = error.start.row, error.start.col
+    row_stop, col_stop = error.stop.row, error.stop.col
+    str = "The field value has an invalid format (number) from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+end
+
+function warn(error, ::Val{:invalid_field_var})
+    row_start, col_start = error.start.row, error.start.col
+    row_stop, col_stop = error.stop.row, error.stop.col
+    str = "The field value has an invalid format (string variable) from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
 end
 
 warn(error) = @warn warn(error, Val(error.kind))
@@ -137,7 +173,7 @@ function inc!(t, char, dumped)
     char == '\n' ? inc_row!(t) : inc_col!(t)
     t.acc.to += 1
     if dumped
-        t.pos_start = t.pos_end
+        t.pos_start = deepcopy(t.pos_end)
         t.acc.from = t.acc.to
     end
 end
@@ -179,7 +215,7 @@ function dump!(parser, char, ::Val{:key})
             parser.task = :field_name
         else
             parser.task = :free
-            e = BibTeXError(:invalid_key, get_acc(parser), parser.pos_start, parser.pos_end)
+            e = BibTeXError(:invalid_key, get_acc(parser;from = 2), parser.pos_start, parser.pos_end)
             push!(parser.errors, e)
         end
     end
@@ -198,7 +234,7 @@ function dump!(parser, char, ::Val{:field_name})
             parser.task = :field_in
         else
             parser.task = :free
-            e = BibTeXError(:invalid_field_name, get_acc(parser), parser.pos_start, parser.pos_end)
+            e = BibTeXError(:invalid_field_name, get_acc(parser; from = 2), parser.pos_start, parser.pos_end)
             push!(parser.errors, e)
         end
     end
@@ -420,7 +456,7 @@ function dump!(parser, char, ::Val{:string})
             parser.task = :string_inquote
         else
             parser.task = :free
-            e = BibTeXError(:invalid_string, get_acc(parser), parser.pos_start, parser.pos_end)
+            e = BibTeXError(:invalid_string, get_acc(parser; from = 2, to = -1), parser.pos_start, parser.pos_end)
             push!(parser.errors, e)
         end
     end
@@ -461,7 +497,7 @@ is_dumped(parser, char) = is_dumped(parser, char, Val(parser.task))
 
 function dump!(parser, char=' ')
     dump!(parser, char, Val(parser.task))
-    parser.pos_start = parser.pos_end
+    parser.pos_start = deepcopy(parser.pos_end)
     parser.acc.from = parser.acc.to
 end
 
@@ -480,7 +516,7 @@ function parse_string(str, ::Val{:bibtex})
     parser = Parser(str)
     foreach(char -> parse!(parser, char), parser.input)
     foreach(error -> warn(error), parser.errors)
-    @info "Dev: " parser
+    # @info "Dev: " parser
     return get_entries(parser)
 end
 
