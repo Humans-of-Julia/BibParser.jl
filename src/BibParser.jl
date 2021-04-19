@@ -28,7 +28,7 @@ Parse a string entry. Default to BibTeX format. No other options available yet (
 """
 function parse_entry(entry::String; parser::Symbol = :BibTeX)
     if parser == :BibTeX
-        BibTeX.parse_bibtex(entry)
+        BibTeX.parse_string(entry, Val(:bibtex))
     end
 end
 
