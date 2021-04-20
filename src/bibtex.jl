@@ -187,6 +187,7 @@ function dump!(parser, char, ::Val{:entry})
         parser.task = :free
         e = BibTeXError(:invalid_kind, get_acc(parser), parser.pos_start, parser.pos_end)
         push!(parser.errors, e)
+        parser.storage = Storage()
     elseif char ∈ ['{', '(']
         set_delim!(parser, char)
         acc = split(lowercase(get_acc(parser; from = 2)), r"[\t ]+")
@@ -198,6 +199,7 @@ function dump!(parser, char, ::Val{:entry})
             parser.task = :free
             e = BibTeXError(:invalid_kind, get_acc(parser), parser.pos_start, parser.pos_end)
             push!(parser.errors, e)
+            parser.storage = Storage()
         end
     end
 end
@@ -217,6 +219,7 @@ function dump!(parser, char, ::Val{:key})
             parser.task = :free
             e = BibTeXError(:invalid_key, get_acc(parser;from = 2), parser.pos_start, parser.pos_end)
             push!(parser.errors, e)
+            parser.storage = Storage()
         end
     end
 end
@@ -236,6 +239,7 @@ function dump!(parser, char, ::Val{:field_name})
             parser.task = :free
             e = BibTeXError(:invalid_field_name, get_acc(parser; from = 2), parser.pos_start, parser.pos_end)
             push!(parser.errors, e)
+            parser.storage = Storage()
         end
     end
 end
@@ -310,9 +314,11 @@ function dump!(parser, char, ::Val{:field_outquote})
             parser.task = :field_next
         elseif char == rev(parser.storage.delim)
             entry = make_entry(parser.storage)
+            parser.storage = Storage()
             push!(parser.content.entries,
             parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
             )
+            parser.storage = Storage()
             parser.task = :free
         end
     end
@@ -358,6 +364,7 @@ function dump!(parser, char, ::Val{:field_var})
                     push!(parser.content.entries, parser.storage.key =>
                         BibInternal.make_bibtex_entry(parser.storage.key, entry)
                     )
+                    parser.storage = Storage()
                     parser.task = :free
                 end
             end
@@ -365,6 +372,7 @@ function dump!(parser, char, ::Val{:field_var})
             parser.task = :free
             e = BibTeXError(:invalid_field_var, get_acc(parser), parser.pos_start, parser.pos_end)
             push!(parser.errors, e)
+            parser.storage = Storage()
         end
     end
 end
@@ -413,6 +421,7 @@ function dump!(parser, char, ::Val{:field_out})
         push!(parser.content.entries,
             parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
         )
+        parser.storage = Storage()
         parser.task = :free
     end
 end
@@ -433,12 +442,14 @@ function dump!(parser, char, ::Val{:field_next})
             parser.task = :free
             e = BibTeXError(:invalid_field_name, get_acc(parser), parser.pos_start, parser.pos_end)
             push!(parser.errors, e)
+            parser.storage = Storage()
         end
     elseif char == rev(parser.storage.delim)
         entry = make_entry(parser.storage)
         push!(parser.content.entries,
             parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
         )
+        parser.storage = Storage()
         parser.task = :free
     end
 end
@@ -458,6 +469,7 @@ function dump!(parser, char, ::Val{:string})
             parser.task = :free
             e = BibTeXError(:invalid_string, get_acc(parser; from = 2, to = -1), parser.pos_start, parser.pos_end)
             push!(parser.errors, e)
+            parser.storage = Storage()
         end
     end
 end
@@ -490,6 +502,7 @@ function dump!(parser, char, ::Val{:string_outquote})
     elseif char == rev(parser.storage.delim)
         parser.content.strings[parser.field.name] = parser.field.value
         parser.task = :free
+        parser.storage = Storage()
     end
 end
 
