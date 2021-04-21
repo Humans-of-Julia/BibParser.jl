@@ -14,15 +14,10 @@ The output of an example parsing a BibTeX file can be found at [baffier.fr/publi
 
 ### BibTeX
 
-Two parsers are available at the moment. The main one is based on [JuliaTeX/BibTeX.jl](https://github.com/JuliaTeX/BibTeX.jl) and can be found in the `bibtex.jl` file.
-
-The second one uses [Automa.jl](https://github.com/BioJulia/Automa.jl). Some restrictions exist regarding the BibTeX grammar, please check `bibtex_automa.jl` for the details.
-- `@string`, `@preamble`, and `@comment` are currently not accepted
-- when the field value is delimited by braces (`{`, `}`), nested braces are not necessarily recognized correctly. However, nested braces within quoted value are fine
-- value are parsed but not interpreted regarding their LaTeX syntax. It is preferable to use unicode syntax.
-Those restrictions are expected to be lifted in the future.
-
-On long term, a parser based on [Tokenize.jl](https://github.com/JuliaLang/Tokenize.jl) is expected.
+A new parser is in used since `v0.2.7`. It is handcrafted, so not very adaptable, but it is almost complete. Currently missing features follow:
+- Applying the LaTeX commands from `@preamble`s entries to other entries
+- Storing `@preamble`, `@string`, `@comment`, and free text to enable the reconstruction of the original `.bib` file
+- Optional transformation of Unicode <-> LaTeX characters
 
 ### Citation Style Language (CSL-JSON)
 
