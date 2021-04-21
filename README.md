@@ -14,7 +14,7 @@ The output of an example parsing a BibTeX file can be found at [baffier.fr/publi
 
 ### BibTeX
 
-A new parser is in used since `v0.2.7`. It is handcrafted, so not very adaptable, but it is almost complete. Currently missing features follow:
+A new parser is in used since `v0.1.12`. It is almost complete. Currently missing features follow:
 - Applying the LaTeX commands from `@preamble`s entries to other entries
 - Storing `@preamble`, `@string`, `@comment`, and free text to enable the reconstruction of the original `.bib` file
 - Optional transformation of Unicode <-> LaTeX characters
