@@ -3,6 +3,7 @@
 [![Build Status](https://github.com/Humans-of-Julia/BibParser.jl/workflows/CI/badge.svg)](https://github.com/Humans-of-Julia/BibParser.jl/actions)
 [![codecov](https://codecov.io/gh/Humans-of-Julia/BibParser.jl/branch/master/graph/badge.svg?token=zkneHUR45j)](https://codecov.io/gh/Humans-of-Julia/BibParser.jl)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Discord chat](https://img.shields.io/discord/762167454973296644.svg?logo=discord&colorB=7289DA&style=flat-square)](https://discord.gg/7KC28q98nP)
 
 # BibParser.jl
 
