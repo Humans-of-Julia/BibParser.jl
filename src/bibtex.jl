@@ -5,11 +5,24 @@ using BibInternal
 
 export parse_string
 
+"""
+    mutable struct Accumulator
+
+A structure to accumulate part of the input stream as a simple string. It differs from Position that store `line` and `column` information.
+"""
 mutable struct Accumulator
     from::Int
     to::Int
 end
 
+"""
+    Content
+
+Store the different BibTeX elements once succesfully parsed.
+
+!!! warning "Note:"
+    Free text, comments entries and preambles entries are currently ignored.
+"""
 struct Content
     # comments::Dict{Int, String}
     entries::OrderedDict{String,BibInternal.Entry}
@@ -18,6 +31,14 @@ struct Content
     strings::Dict{String,String}
 end
 
+"""
+    Content()
+
+Create an (almost) empty content constructor for a new `Parser`. Some usual BibTeX content is added:
+- List of months abbreviations in English (added automatically by some BibTeX class)
+
+Feel free to contribute to more default content.
+"""
 function Content()
     # comments = Dict{Int, String}()
     entries = OrderedDict{String,BibInternal.Entry}()
@@ -40,6 +61,17 @@ function Content()
     return Content(entries, strings)
 end
 
+"""
+    Field
+
+A structure that can store BibTeX fields information.
+
+# Arguments:
+- `braces::Int`: counter to the number of opened braces in a field being parsed
+- `name::String`: name of the field being parsed
+- `quotes::Bool`: `true` if the field is delimited by quotes
+- `value::String`: the value of the field
+"""
 mutable struct Field
     braces::Int
     name::String
@@ -49,14 +81,34 @@ mutable struct Field
     Field() = new(0, "", false, "")
 end
 
+"""
+    Position
 
+A structure pointing to a position in the input based on rows and columns.
+"""
 mutable struct Position
     row::Int
     col::Int
 end
 
+"""
+    Position()
+
+Initial position constructor
+"""
 Position() = Position(0, 0)
 
+"""
+    Storage
+
+Store the content of an entry being parsed.
+
+# Arguments:
+- `delim::Union{Char, Nothing}`: the character delimiting the entry
+- `fields::Vector{Field}`: a collection of the entry's fields
+- `key::String`: the key of the entry
+- `kind::String`: the kind/type of BibTeX entry
+"""
 mutable struct Storage
     delim::Union{Char,Nothing}
     fields::Vector{Field}
@@ -64,8 +116,17 @@ mutable struct Storage
     kind::String
 end
 
+"""
+    Storage()
+Empty storage constructor called when a new entry is being parsed.
+"""
 Storage() = Storage(nothing, Vector{Field}(), "", "")
 
+"""
+    make_entry(storage)
+
+Make a `BibInternal.Entry` from a completed entry in a parser storage.
+"""
 function make_entry(storage)
     # @info "making entry" storage
     d = Dict("_type" => storage.kind)
@@ -73,6 +134,17 @@ function make_entry(storage)
     return d
 end
 
+"""
+    BibTeXError
+
+Description of a BibTeXError, including the relevant position in the input string.
+
+# Arguments:
+- `kind::Symbol`: the type of BibTeX error
+- `input::String`: the BibTeX string being parsed
+- `start::Position`: the row/col start position of the BibTeXError
+- `stop::Position`: the row/col end position of the BibTeXError
+"""
 struct BibTeXError
     kind::Symbol
     input::String
@@ -124,8 +196,29 @@ function warn(error, ::Val{:invalid_field_var})
     str = "The field value has an invalid format (string variable) from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
 end
 
+"""
+    warn(error)
+
+Dispatch a BibTeX error as a Julia warning based on the type of error.
+"""
 warn(error) = @warn warn(error, Val(error.kind))
 
+"""
+    Parser
+
+A structure allowing to parse a BibTeX formatted string one character at a time.
+
+# Arguments:
+- `acc::Accumulator`: an accumulated string from last `dump` to `content`
+- `content::Content`: the current content of a parser
+- `errors::Vector{BibTeXError}`: a collection of BibTeX errors
+- `field::Field`: temporary storage for an entry fields names
+- `input::Vector{Char}`: the BibTeX string
+- `pos_start::Position`: pointer to the raw/col start position
+- `pos_end::Position`: pointer to the raw/col end position
+- `storage::Storage`: temporary storage of the content of an entry being parsed
+- `task::Symbol`: describe which part of the BibTeX gramma is being parsed
+"""
 mutable struct Parser
     acc::Accumulator
     content::Content
@@ -151,30 +244,83 @@ mutable struct Parser
     end
 end
 
+"""
+    rev(char)
+
+Return the closing character `)`/`}` matching either `(` or `{`.
+"""
 rev(char) = char == '(' ? ')' : '}'
 
+"""
+    get_entries(parser)
+
+Retrieve the entries succesfully parsed by `parser`.
+"""
 get_entries(parser) = parser.content.entries
+
+"""
+    get_acc(parser; from = 1, to = 0)
+
+Retrieve the `Accumulator` of the parser.
+
+# Arguments:
+- `parser`: a `Parser`
+- `from`: a positive offset from the start of the `Accumulator`, default to `1`
+- `to`:  a negative offset from the end of the `Accumulator`, default to `0`
+"""
 function get_acc(parser; from = 1, to = 0)
     a = from + parser.acc.from - 1
     b = parser.acc.to - to
     return prod(parser.input[a:b])
 end
 
+"""
+    set_delim!(parser, char)
+
+Set the delimiter for this section of the entry to parenthesis or braces.
+"""
 set_delim!(parser, char) = parser.storage.delim = char
+
+"""
+    set_entry_kind!(parser, kind) = begin
+
+Set the kind of the entry being parsed in the `parser`'s storage.
+"""
 set_entry_kind!(parser, kind) = parser.storage.kind = kind
 
-inc_col!(t) = t.pos_end.col += 1
-function inc_row!(t)
-    t.pos_end.row += 1
-    t.pos_end.col = 1
+"""
+    inc_col!(parser) = begin
+
+Increment the `column` field of the pointer to the end position of the Parser.
+"""
+inc_col!(parser) = parser.pos_end.col += 1
+
+"""
+    inc_row!(parser)
+
+Increment the `row` field of the pointer to the end position of the Parser.
+"""
+function inc_row!(parser)
+    parser.pos_end.row += 1
+    parser.pos_end.col = 1
 end
 
-function inc!(t, char, dumped)
-    char == '\n' ? inc_row!(t) : inc_col!(t)
-    t.acc.to += 1
+"""
+    inc!(parser, char, dumped)
+
+Increment the start/end position and accumulator of the parser.
+
+# Arguments:
+- `parser`: a `BibTeX.Parser` structure
+- `char`: the character being parsed
+- `dumped`: boolean value describing if the `Accumulator` content is being dumped into the parser `Content`
+"""
+function inc!(parser, char, dumped)
+    char == '\n' ? inc_row!(parser) : inc_col!(parser)
+    parser.acc.to += 1
     if dumped
-        t.pos_start = deepcopy(t.pos_end)
-        t.acc.from = t.acc.to
+        parser.pos_start = deepcopy(parser.pos_end)
+        parser.acc.from = parser.acc.to
     end
 end
 
@@ -506,14 +652,29 @@ function dump!(parser, char, ::Val{:string_outquote})
     end
 end
 
+"""
+    is_dumped(parser, char)
+
+Check if an `Accumulator` needs to be `dump!`ed. Dispatch to the appropriate `is_dumped` method according to the state of the parser.
+"""
 is_dumped(parser, char) = is_dumped(parser, char, Val(parser.task))
 
+"""
+    dump!(parser, char = ' ')
+
+Dump the content of the parser `Accumulator` into the parser `Content`. Dispatch to the appropriate `dump!` method according to the state of the parser.
+"""
 function dump!(parser, char=' ')
     dump!(parser, char, Val(parser.task))
     parser.pos_start = deepcopy(parser.pos_end)
     parser.acc.from = parser.acc.to
 end
 
+"""
+    parse!(parser, char)
+
+Parse a single character of a BibTeX string. Modify the `Parser` accordingly.
+"""
 function parse!(parser, char)
     dumped = is_dumped(parser, char)
     dumped && dump!(parser, char)
@@ -525,17 +686,23 @@ function parse!(parser, char)
     # @warn parser.acc parser.content parser.field parser.input parser.pos_start parser.pos_end parser.storage parser.task
 end
 
-function parse_string(str, ::Val{:bibtex})
+"""
+    parse_string(str)
+
+Parse a BibTeX string of entries. Raise a detailed warning for each invalid entry.
+"""
+function parse_string(str)
     parser = Parser(str)
     foreach(char -> parse!(parser, char), parser.input)
     foreach(error -> warn(error), parser.errors)
-    # @info "Dev: " parser
     return get_entries(parser)
 end
 
-function parse_file(path::String)
-    entries = parse_string(read(path, String), Val(:bibtex))
-    return entries
-end
+"""
+    parse_file(path)
+
+Parse a BibTeX file located at `path`. Raise a detailed warning for each invalid entry.
+"""
+parse_file(path) = parse_string(read(path, String))
 
 end # module
