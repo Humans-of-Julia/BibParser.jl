@@ -128,7 +128,6 @@ Storage() = Storage(nothing, Vector{Field}(), "", "")
 Make a `BibInternal.Entry` from a completed entry in a parser storage.
 """
 function make_entry(storage)
-    # @info "making entry" storage
     d = Dict("_type" => storage.kind)
     foreach(field -> push!(d, field.name => field.value), storage.fields)
     return d
@@ -460,7 +459,6 @@ function dump!(parser, char, ::Val{:field_outquote})
             parser.task = :field_next
         elseif char == rev(parser.storage.delim)
             entry = make_entry(parser.storage)
-            parser.storage = Storage()
             push!(parser.content.entries,
             parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
             )
@@ -496,7 +494,6 @@ function dump!(parser, char, ::Val{:field_var})
     else
         acc = split(get_acc(parser), r"[\t\r\n ]+"; keepempty=false)
         if length(acc) == 1
-            # @info "Printing" parser.content.strings[acc[1]] parser.field.value
             parser.field.value *= parser.content.strings[acc[1]]
             if char == '#'
                 parser.task = :field_concat
@@ -563,7 +560,6 @@ function dump!(parser, char, ::Val{:field_out})
         parser.task = :field_next
     elseif char == rev(parser.storage.delim)
         entry = make_entry(parser.storage)
-        # @show entry
         push!(parser.content.entries,
             parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
         )
