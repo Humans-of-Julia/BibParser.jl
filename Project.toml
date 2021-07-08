@@ -1,7 +1,7 @@
 name = "BibParser"
 uuid = "13533e5b-e1c2-4e57-8cef-cac5e52f6474"
 authors = ["azzaare <jf@baffier.fr>"]
-version = "0.1.17"
+version = "0.1.18"
 
 [deps]
 BibInternal = "2027ae74-3657-4b95-ae00-e2f7d55c3e64"
