@@ -401,6 +401,7 @@ function dump!(parser, char, ::Val{:field_in})
         parser.task = :field_inquote
     elseif char == '{'
         parser.task = :field_inbrace
+        parser.field.braces += 1
     elseif occursin(r"[0-9]", char)
         parser.task = :field_number
     elseif occursin(r"[a-zA-Z]", char)
@@ -408,23 +409,30 @@ function dump!(parser, char, ::Val{:field_in})
     end
 end
 
-is_dumped(parser, char, ::Val{:field_inbrace}) = char ∈ ['@', '{', '}']
+function is_dumped(parser, char, ::Val{:field_inbrace})
+    if char == '{'
+        parser.field.braces += 1
+        return false
+    elseif char == '}'
+        parser.field.braces -= 1
+        return (parser.field.braces == 0)
+    elseif char == '@'
+        return true
+    else
+        return false
+    end
+end
 function dump!(parser, char, ::Val{:field_inbrace})
     if char == '@'
         parser.task = :entry
+        parser.field.braces = 0
         e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
         push!(parser.errors, e)
-    elseif char == '}' && parser.field.braces == 0
+    elseif char == '}'
         parser.field.value *= get_acc(parser; from = 2)
         push!(parser.storage.fields, deepcopy(parser.field))
         parser.field.value = ""
         parser.task = :field_out
-    elseif char == '{'
-        parser.field.value *= get_acc(parser; from = 2) # * parser.field.value
-        parser.field.braces += 1
-    elseif char == '}'
-        parser.field.value *= get_acc(parser; from = 1, to = -1) # * parser.field.value
-        parser.field.braces -= 1
     end
 end
 
