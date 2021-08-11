@@ -156,43 +156,43 @@ end
 function warn(error, ::Val)
     row_start, col_start = error.start.row, error.start.col
     row_stop, col_stop = error.stop.row, error.stop.col
-    str = "The entry kind is invalid from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+    return str = "The entry kind is invalid from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
 end
 
 function warn(error, ::Val{:invalid_string})
     row_start, col_start = error.start.row, error.start.col
     row_stop, col_stop = error.stop.row, error.stop.col
-    str = "The string entry is invalid from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+    return str = "The string entry is invalid from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
 end
 
 function warn(error, ::Val{:incomplete_entry})
     row_start, col_start = error.start.row, error.start.col
     row_stop, col_stop = error.stop.row, error.stop.col
-    str = "The entry is incomplete and end from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+    return str = "The entry is incomplete and end from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
 end
 
 function warn(error, ::Val{:invalid_key})
     row_start, col_start = error.start.row, error.start.col
     row_stop, col_stop = error.stop.row, error.stop.col
-    str = "The entry key is invalid from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+    return str = "The entry key is invalid from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
 end
 
 function warn(error, ::Val{:invalid_field_name})
     row_start, col_start = error.start.row, error.start.col
     row_stop, col_stop = error.stop.row, error.stop.col
-    str = "The field name is invalid from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+    return str = "The field name is invalid from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
 end
 
 function warn(error, ::Val{:invalid_field_number})
     row_start, col_start = error.start.row, error.start.col
     row_stop, col_stop = error.stop.row, error.stop.col
-    str = "The field value has an invalid format (number) from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+    return str = "The field value has an invalid format (number) from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
 end
 
 function warn(error, ::Val{:invalid_field_var})
     row_start, col_start = error.start.row, error.start.col
     row_stop, col_stop = error.stop.row, error.stop.col
-    str = "The field value has an invalid format (string variable) from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
+    return str = "The field value has an invalid format (string variable) from (line $row_start, character $col_start) to (line $row_stop, character $col_stop): $(error.input)"
 end
 
 """
@@ -229,7 +229,8 @@ mutable struct Parser
     storage::Storage
     task::Symbol
 
-    function Parser(input;
+    function Parser(
+        input;
         acc=Accumulator(1, 0),
         content=Content(),
         errors=Vector{BibTeXError}(),
@@ -239,7 +240,9 @@ mutable struct Parser
         storage=Storage(),
         task=:free,
     )
-        new(acc, content, errors, field, collect(input), pos_start, pos_end, storage, task)
+        return new(
+            acc, content, errors, field, collect(input), pos_start, pos_end, storage, task
+        )
     end
 end
 
@@ -267,7 +270,7 @@ Retrieve the `Accumulator` of the parser.
 - `from`: a positive offset from the start of the `Accumulator`, default to `1`
 - `to`:  a negative offset from the end of the `Accumulator`, default to `0`
 """
-function get_acc(parser; from = 1, to = 0)
+function get_acc(parser; from=1, to=0)
     a = from + parser.acc.from - 1
     b = parser.acc.to - to
     return prod(parser.input[a:b])
@@ -301,7 +304,7 @@ Increment the `row` field of the pointer to the end position of the Parser.
 """
 function inc_row!(parser)
     parser.pos_end.row += 1
-    parser.pos_end.col = 1
+    return parser.pos_end.col = 1
 end
 
 """
@@ -335,14 +338,16 @@ function dump!(parser, char, ::Val{:entry})
         parser.storage = Storage()
     elseif char ∈ ['{', '(']
         set_delim!(parser, char)
-        acc = split(lowercase(get_acc(parser; from = 2)), r"[\t ]+")
+        acc = split(lowercase(get_acc(parser; from=2)), r"[\t ]+")
         if length(acc) ≤ 1 && !isempty(acc[1])
             set_entry_kind!(parser, acc[1])
             # parser.task = acc[1] ∈ ["comment", "preamble", "string"] ? Symbol(acc[1]) : :key
             parser.task = acc[1] ∈ ["string"] ? Symbol(acc[1]) : :key
         else
             parser.task = :free
-            e = BibTeXError(:invalid_kind, get_acc(parser), parser.pos_start, parser.pos_end)
+            e = BibTeXError(
+                :invalid_kind, get_acc(parser), parser.pos_start, parser.pos_end
+            )
             push!(parser.errors, e)
             parser.storage = Storage()
         end
@@ -353,16 +358,20 @@ is_dumped(parser, char, ::Val{:key}) = char ∈ ['@', ',']
 function dump!(parser, char, ::Val{:key})
     if char == '@'
         parser.task = :entry
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     elseif char == ','
-        acc = split(get_acc(parser; from = 2), r"[\t ]+")
+        acc = split(get_acc(parser; from=2), r"[\t ]+")
         if length(acc) ≤ 1 && !isempty(acc[1])
             parser.storage.key = acc[1]
             parser.task = :field_name
         else
             parser.task = :free
-            e = BibTeXError(:invalid_key, get_acc(parser;from = 2), parser.pos_start, parser.pos_end)
+            e = BibTeXError(
+                :invalid_key, get_acc(parser; from=2), parser.pos_start, parser.pos_end
+            )
             push!(parser.errors, e)
             parser.storage = Storage()
         end
@@ -373,16 +382,23 @@ is_dumped(parser, char, ::Val{:field_name}) = char ∈ ['=', '@']
 function dump!(parser, char, ::Val{:field_name})
     if char == '@'
         parser.task = :entry
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     elseif char == '='
-        acc = split(get_acc(parser; from = 2), r"[\t\r\n ]+"; keepempty=false)
+        acc = split(get_acc(parser; from=2), r"[\t\r\n ]+"; keepempty=false)
         if length(acc) == 1
             parser.field.name = acc[1]
             parser.task = :field_in
         else
             parser.task = :free
-            e = BibTeXError(:invalid_field_name, get_acc(parser; from = 2), parser.pos_start, parser.pos_end)
+            e = BibTeXError(
+                :invalid_field_name,
+                get_acc(parser; from=2),
+                parser.pos_start,
+                parser.pos_end,
+            )
             push!(parser.errors, e)
             parser.storage = Storage()
         end
@@ -393,7 +409,9 @@ is_dumped(parser, char, ::Val{:field_in}) = occursin(r"[0-9@a-zA-Z\"{]", char)
 function dump!(parser, char, ::Val{:field_in})
     if char == '@'
         parser.task = :entry
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     elseif char == '"'
         parser.pos_start.col += 1
@@ -426,10 +444,12 @@ function dump!(parser, char, ::Val{:field_inbrace})
     if char == '@'
         parser.task = :entry
         parser.field.braces = 0
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     elseif char == '}'
-        parser.field.value *= get_acc(parser; from = 2)
+        parser.field.value *= get_acc(parser; from=2)
         push!(parser.storage.fields, deepcopy(parser.field))
         parser.field.value = ""
         parser.task = :field_out
@@ -439,13 +459,13 @@ end
 is_dumped(parser, char, ::Val{:field_inquote}) = char ∈ ['{', '"', '}']
 function dump!(parser, char, ::Val{:field_inquote})
     if char == '"' && parser.field.braces == 0
-        parser.field.value *= get_acc(parser; from = 2)
+        parser.field.value *= get_acc(parser; from=2)
         parser.task = :field_outquote
     elseif char == '{'
-        parser.field.value *= get_acc(parser; from = 2) # * parser.field.value
+        parser.field.value *= get_acc(parser; from=2) # * parser.field.value
         parser.field.braces += 1
     elseif char == '}'
-        parser.field.value *= get_acc(parser; from = 1, to = -1) # * parser.field.value
+        parser.field.value *= get_acc(parser; from=1, to=-1) # * parser.field.value
         parser.field.braces -= 1
     end
 end
@@ -456,7 +476,9 @@ end
 function dump!(parser, char, ::Val{:field_outquote})
     if char == '@'
         parser.task = :entry
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     elseif char == '#'
         parser.task = :field_concat
@@ -467,8 +489,10 @@ function dump!(parser, char, ::Val{:field_outquote})
             parser.task = :field_next
         elseif char == rev(parser.storage.delim)
             entry = make_entry(parser.storage)
-            push!(parser.content.entries,
-            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
+            push!(
+                parser.content.entries,
+                parser.storage.key =>
+                    BibInternal.make_bibtex_entry(parser.storage.key, entry),
             )
             parser.storage = Storage()
             parser.task = :free
@@ -480,7 +504,9 @@ is_dumped(parser, char, ::Val{:field_concat}) = occursin(r"[a-zA-Z\"@]", char)
 function dump!(parser, char, ::Val{:field_concat})
     if char == '@'
         parser.task = :entry
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     elseif char == '"'
         parser.pos_start.col += 1
@@ -497,7 +523,9 @@ end
 function dump!(parser, char, ::Val{:field_var})
     if char == '@'
         parser.task = :entry
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     else
         acc = split(get_acc(parser), r"[\t\r\n ]+"; keepempty=false)
@@ -512,8 +540,10 @@ function dump!(parser, char, ::Val{:field_var})
                     parser.task = :field_next
                 elseif char == rev(parser.storage.delim)
                     entry = make_entry(parser.storage)
-                    push!(parser.content.entries, parser.storage.key =>
-                        BibInternal.make_bibtex_entry(parser.storage.key, entry)
+                    push!(
+                        parser.content.entries,
+                        parser.storage.key =>
+                            BibInternal.make_bibtex_entry(parser.storage.key, entry),
                     )
                     parser.storage = Storage()
                     parser.task = :free
@@ -521,18 +551,22 @@ function dump!(parser, char, ::Val{:field_var})
             end
         else
             parser.task = :free
-            e = BibTeXError(:invalid_field_var, get_acc(parser), parser.pos_start, parser.pos_end)
+            e = BibTeXError(
+                :invalid_field_var, get_acc(parser), parser.pos_start, parser.pos_end
+            )
             push!(parser.errors, e)
             parser.storage = Storage()
         end
     end
 end
 
-is_dumped(parser, char, ::Val{:field_number}) = char ∈ ['@', ',',rev(parser.storage.delim)]
+is_dumped(parser, char, ::Val{:field_number}) = char ∈ ['@', ',', rev(parser.storage.delim)]
 function dump!(parser, char, ::Val{:field_number})
     if char == '@'
         parser.task = :entry
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     else
         acc = split(get_acc(parser), r"[\t\r\n ]+"; keepempty=false)
@@ -545,14 +579,18 @@ function dump!(parser, char, ::Val{:field_number})
                 parser.task = :field_next
             elseif char == rev(parser.storage.delim)
                 entry = make_entry(parser.storage)
-                push!(parser.content.entries,
-                parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
+                push!(
+                    parser.content.entries,
+                    parser.storage.key =>
+                        BibInternal.make_bibtex_entry(parser.storage.key, entry),
                 )
                 parser.task = :free
             end
         else
             parser.task = :free
-            e = BibTeXError(:invalid_field_number, get_acc(parser), parser.pos_start, parser.pos_end)
+            e = BibTeXError(
+                :invalid_field_number, get_acc(parser), parser.pos_start, parser.pos_end
+            )
             push!(parser.errors, e)
         end
     end
@@ -562,14 +600,17 @@ is_dumped(parser, char, ::Val{:field_out}) = char ∈ ['@', ',', rev(parser.stor
 function dump!(parser, char, ::Val{:field_out})
     if char == '@'
         parser.task = :entry
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     elseif char == ','
         parser.task = :field_next
     elseif char == rev(parser.storage.delim)
         entry = make_entry(parser.storage)
-        push!(parser.content.entries,
-            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
+        push!(
+            parser.content.entries,
+            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry),
         )
         parser.storage = Storage()
         parser.task = :free
@@ -580,24 +621,29 @@ is_dumped(parser, char, ::Val{:field_next}) = char ∈ ['=', '@', rev(parser.sto
 function dump!(parser, char, ::Val{:field_next})
     if char == '@'
         parser.task = :entry
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     elseif char == '='
-        acc = split(get_acc(parser; from = 2), r"[\t\r\n ]+"; keepempty=false)
+        acc = split(get_acc(parser; from=2), r"[\t\r\n ]+"; keepempty=false)
         # @show acc
         if length(acc) == 1
             parser.field.name = acc[1]
             parser.task = :field_in
         else
             parser.task = :free
-            e = BibTeXError(:invalid_field_name, get_acc(parser), parser.pos_start, parser.pos_end)
+            e = BibTeXError(
+                :invalid_field_name, get_acc(parser), parser.pos_start, parser.pos_end
+            )
             push!(parser.errors, e)
             parser.storage = Storage()
         end
     elseif char == rev(parser.storage.delim)
         entry = make_entry(parser.storage)
-        push!(parser.content.entries,
-            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry)
+        push!(
+            parser.content.entries,
+            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry),
         )
         parser.storage = Storage()
         parser.task = :free
@@ -608,16 +654,23 @@ is_dumped(parser, char, ::Val{:string}) = char ∈ ['=', '@']
 function dump!(parser, char, ::Val{:string})
     if char == '@'
         parser.task = :entry
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     elseif char == '='
-        acc = split(get_acc(parser; from = 2), r"[\t\r\n ]+"; keepempty=false)
+        acc = split(get_acc(parser; from=2), r"[\t\r\n ]+"; keepempty=false)
         if length(acc) == 1
             parser.field.name = acc[1]
             parser.task = :string_inquote
         else
             parser.task = :free
-            e = BibTeXError(:invalid_string, get_acc(parser; from = 2, to = -1), parser.pos_start, parser.pos_end)
+            e = BibTeXError(
+                :invalid_string,
+                get_acc(parser; from=2, to=-1),
+                parser.pos_start,
+                parser.pos_end,
+            )
             push!(parser.errors, e)
             parser.storage = Storage()
         end
@@ -628,7 +681,9 @@ is_dumped(parser, char, ::Val{:string_inquote}) = char ∈ ['"', '@']
 function dump!(parser, char, ::Val{:string_inquote})
     if char == '@'
         parser.task = :entry
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     elseif char == '"'
         parser.task = :string_value
@@ -638,7 +693,7 @@ end
 is_dumped(parser, char, ::Val{:string_value}) = char ∈ ['"']
 function dump!(parser, char, ::Val{:string_value})
     if char == '"'
-        parser.field.value = get_acc(parser; from = 2)
+        parser.field.value = get_acc(parser; from=2)
         parser.task = :string_outquote
     end
 end
@@ -647,7 +702,9 @@ is_dumped(parser, char, ::Val{:string_outquote}) = char ∈ [rev(parser.storage.
 function dump!(parser, char, ::Val{:string_outquote})
     if char == '@'
         parser.task = :entry
-        e = BibTeXError(:incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end)
+        e = BibTeXError(
+            :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
+        )
         push!(parser.errors, e)
     elseif char == rev(parser.storage.delim)
         parser.content.strings[parser.field.name] = parser.field.value
@@ -671,7 +728,7 @@ Dump the content of the parser `Accumulator` into the parser `Content`. Dispatch
 function dump!(parser, char=' ')
     dump!(parser, char, Val(parser.task))
     parser.pos_start = deepcopy(parser.pos_end)
-    parser.acc.from = parser.acc.to
+    return parser.acc.from = parser.acc.to
 end
 
 """
@@ -682,12 +739,7 @@ Parse a single character of a BibTeX string. Modify the `Parser` accordingly.
 function parse!(parser, char)
     dumped = is_dumped(parser, char)
     dumped && dump!(parser, char)
-    inc!(parser, char, dumped)
-    # fieldout = parser.task == :field_out
-    # dumped && @info parser parser char dumped
-    # dumped && @warn parser.acc parser.content parser.field parser.input parser.pos_start parser.pos_end parser.storage parser.task
-    # @info parser parser char dumped
-    # @warn parser.acc parser.content parser.field parser.input parser.pos_start parser.pos_end parser.storage parser.task
+    return inc!(parser, char, dumped)
 end
 
 """

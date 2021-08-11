@@ -5,7 +5,7 @@ for file in ["test.bib", "error.bib"]
     println("\nstart $file")
     parsed = parse_file("../examples/$file")
 
-    for (k,e) in pairs(parsed)
+    for (k, e) in pairs(parsed)
         println("|--->$(e.id)")
         for fn in fieldnames(typeof(e))
             println("|     |----$(string(fn)) -> parsed!") # TODO: better printing
