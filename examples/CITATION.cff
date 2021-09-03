@@ -1,0 +1,42 @@
+abstract: Abstract
+authors:
+  - family-names: Family
+    given-names: Given
+cff-version: 1.2.0
+date-released: "2021-07-18"
+identifiers:
+  - description: Description
+    type: doi
+    value: 10.5281/zenodo.123456
+  - description: Other description
+    type: doi
+    value: 10.5281/zenodo.123457
+keywords:
+  - "awesome software"
+  - research
+license: Apache-2.0
+repository-code: "https://github.com/Humans-of-Julia/Bibliography.jl"
+version: 0.11.2
+message: "If you use this software, please cite both the article from preferred-citation and the software itself."
+preferred-citation:
+  authors:
+    - family-names: Family
+      given-names: Given
+      name-particle: Jr
+      name-suffix: "2"
+    - name: Somebody
+      address: Street St.
+  title: "Software paper"
+  type: article
+  identifiers:
+    - description: Some description
+      type: doi
+      value: 10.1234/zenodo.123456
+  repository-code: "https://github.com/Humans-of-Julia/BibParser.jl"
+  date-released: "2021-09-03"
+  publisher:
+    name: Some publisher
+  journal: Some journal
+  issue: 2
+  volume: 3
+title: "My Research Software"
