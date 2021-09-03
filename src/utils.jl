@@ -1,3 +1,7 @@
+module Utils
+
+export iszero, occursin, name_to_string
+
 """
     Base.iszero(t::Tuple)
 
@@ -11,7 +15,6 @@ Extends `occursin` to test if a regular expression `re` is a match with a `Char`
 """
 Base.occursin(re, char::Char) = occursin(re, string(char))
 
-module Utils
 """
     name_to_string(name::BibInternal.Name)
 

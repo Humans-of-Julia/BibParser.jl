@@ -19,12 +19,12 @@ import .CFF
 
 """
     parse_file(path::String; parser::Symbol = :BibTeX)
-Parse a bibliography file. Default to BibTeX format. No other options available yet (CSL-JSON coming soon).
+Parse a bibliography file. Default to BibTeX format. Other options available: CFF (CSL-JSON coming soon).
 """
-function parse_file(path; parser=:BibTeX)
-    parser == :BibTeX && return BibTeX.parse_file(path)
-    parser == :CFF && return CFF.parse_file(path)
-end
+parse_file(path, ::Val{:BibTeX})   = BibTeX.parse_file(path)
+parse_file(path, ::Val{:CFF})      = CFF.parse_file(path)
+
+parse_file(path, parser = :BibTeX) = parse_file(path, Val(parser))
 
 
 """
