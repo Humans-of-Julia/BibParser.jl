@@ -23,3 +23,7 @@ A new parser is in used since `v0.1.12`. It is almost complete. Currently missin
 ### Citation Style Language (CSL-JSON)
 
 Ongoing work.
+
+### CFF
+
+This implementation follows similar parsers: [cff-converter-python](https://github.com/citation-file-format/cff-converter-python) and [ruby-cff](https://github.com/citation-file-format/ruby-cff).
