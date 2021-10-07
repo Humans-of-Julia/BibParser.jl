@@ -1,7 +1,3 @@
-module Utils
-
-export iszero, occursin, name_to_string
-
 """
     Base.iszero(t::Tuple)
 
@@ -35,5 +31,3 @@ function name_to_string(name)
     end
     return str
 end
-
-end # module

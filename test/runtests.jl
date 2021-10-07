@@ -3,7 +3,7 @@ using Test
 
 const PACKAGE_ROOT = pkgdir(BibParser)
 
-function test_bibtex()
+@testset "BibTeX" begin
     for file in ["test.bib", "error.bib"]
         println("\nstart $file")
         parsed = parse_file(joinpath(PACKAGE_ROOT, "examples", "$file"))
@@ -21,18 +21,16 @@ function test_bibtex()
     end
 end
 
-function test_cff()
-    for file in ["CITATION.cff", "invalid_yaml.cff", "invalid_version.cff", "invalid_schema.cff"]
-        @info "Start $file"
+@testset "CFF" begin
+    files = [
+        ("CITATION.cff",        true),
+        ("invalid_yaml.cff",    false),
+        ("invalid_version.cff", false),
+        ("invalid_schema.cff",  false)
+    ]
+    @testset "$file" for (file, expected_result) in files
         parsed, result = parse_file(joinpath(PACKAGE_ROOT, "examples", file), :CFF)
-        if result
-            @info "OK"
-        else
-            @info "Error"
-        end
+
+        @test result == expected_result
     end
 end
-
-
-test_bibtex()
-test_cff()
