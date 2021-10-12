@@ -1,7 +1,7 @@
 name = "BibParser"
 uuid = "13533e5b-e1c2-4e57-8cef-cac5e52f6474"
 authors = ["azzaare <jf@baffier.fr>"]
-version = "0.1.18"
+version = "0.1.19"
 
 [deps]
 BibInternal = "2027ae74-3657-4b95-ae00-e2f7d55c3e64"
@@ -13,6 +13,6 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 [compat]
 BibInternal = "0.3"
 DataStructures = "0.18"
-JSONSchema = "0.3"
+JSONSchema = "1"
 YAML = "0.4"
 julia = "1.4"
