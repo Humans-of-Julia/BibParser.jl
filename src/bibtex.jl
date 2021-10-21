@@ -216,6 +216,7 @@ A structure allowing to parse a BibTeX formatted string one character at a time.
 - `pos_start::Position`: pointer to the raw/col start position
 - `pos_end::Position`: pointer to the raw/col end position
 - `storage::Storage`: temporary storage of the content of an entry being parsed
+- `rules_checker::Bool`: indicate which level `:error`, `:warn`, or `:none` should be raised when an entry violates BibTeX rules
 - `task::Symbol`: describe which part of the BibTeX gramma is being parsed
 """
 mutable struct Parser
@@ -226,6 +227,7 @@ mutable struct Parser
     input::Vector{Char}
     pos_start::Position
     pos_end::Position
+    rules_checker::Symbol
     storage::Storage
     task::Symbol
 
@@ -237,11 +239,21 @@ mutable struct Parser
         field=Field(),
         pos_start=Position(1, 1),
         pos_end=Position(1, 0),
+        rules_checker=:error,
         storage=Storage(),
         task=:free,
     )
         return new(
-            acc, content, errors, field, collect(input), pos_start, pos_end, storage, task
+            acc,
+            content,
+            errors,
+            field,
+            collect(input),
+            pos_start,
+            pos_end,
+            rules_checker,
+            storage,
+            task,
         )
     end
 end
@@ -326,10 +338,10 @@ function inc!(parser, char, dumped)
     end
 end
 
-is_dumped(parser, char, ::Val{:free}) = char == '@'
+is_dumped(::Parser, char, ::Val{:free}) = char == '@'
 dump!(parser, char, ::Val) = char == '@' && (parser.task = :entry)
 
-is_dumped(parser, char, ::Val{:entry}) = occursin(r"[@{\(\n]", char)
+is_dumped(::Parser, char, ::Val{:entry}) = occursin(r"[@{\(\n]", char)
 function dump!(parser, char, ::Val{:entry})
     if char == '\n'
         parser.task = :free
@@ -354,7 +366,7 @@ function dump!(parser, char, ::Val{:entry})
     end
 end
 
-is_dumped(parser, char, ::Val{:key}) = char ∈ ['@', ',']
+is_dumped(::Parser, char, ::Val{:key}) = char ∈ ['@', ',']
 function dump!(parser, char, ::Val{:key})
     if char == '@'
         parser.task = :entry
@@ -378,7 +390,7 @@ function dump!(parser, char, ::Val{:key})
     end
 end
 
-is_dumped(parser, char, ::Val{:field_name}) = char ∈ ['=', '@']
+is_dumped(::Parser, char, ::Val{:field_name}) = char ∈ ['=', '@']
 function dump!(parser, char, ::Val{:field_name})
     if char == '@'
         parser.task = :entry
@@ -405,7 +417,7 @@ function dump!(parser, char, ::Val{:field_name})
     end
 end
 
-is_dumped(parser, char, ::Val{:field_in}) = occursin(r"[0-9@a-zA-Z\"{]", char)
+is_dumped(::Parser, char, ::Val{:field_in}) = occursin(r"[0-9@a-zA-Z\"{]", char)
 function dump!(parser, char, ::Val{:field_in})
     if char == '@'
         parser.task = :entry
@@ -456,7 +468,7 @@ function dump!(parser, char, ::Val{:field_inbrace})
     end
 end
 
-is_dumped(parser, char, ::Val{:field_inquote}) = char ∈ ['{', '"', '}']
+is_dumped(::Parser, char, ::Val{:field_inquote}) = char ∈ ['{', '"', '}']
 function dump!(parser, char, ::Val{:field_inquote})
     if char == '"' && parser.field.braces == 0
         parser.field.value *= get_acc(parser; from=2)
@@ -489,10 +501,11 @@ function dump!(parser, char, ::Val{:field_outquote})
             parser.task = :field_next
         elseif char == rev(parser.storage.delim)
             entry = make_entry(parser.storage)
+            check = parser.rules_checker
             push!(
                 parser.content.entries,
                 parser.storage.key =>
-                    BibInternal.make_bibtex_entry(parser.storage.key, entry),
+                    BibInternal.make_bibtex_entry(parser.storage.key, entry; check),
             )
             parser.storage = Storage()
             parser.task = :free
@@ -500,7 +513,7 @@ function dump!(parser, char, ::Val{:field_outquote})
     end
 end
 
-is_dumped(parser, char, ::Val{:field_concat}) = occursin(r"[a-zA-Z\"@]", char)
+is_dumped(::Parser, char, ::Val{:field_concat}) = occursin(r"[a-zA-Z\"@]", char)
 function dump!(parser, char, ::Val{:field_concat})
     if char == '@'
         parser.task = :entry
@@ -540,10 +553,11 @@ function dump!(parser, char, ::Val{:field_var})
                     parser.task = :field_next
                 elseif char == rev(parser.storage.delim)
                     entry = make_entry(parser.storage)
+                    check = parser.rules_checker
                     push!(
                         parser.content.entries,
                         parser.storage.key =>
-                            BibInternal.make_bibtex_entry(parser.storage.key, entry),
+                            BibInternal.make_bibtex_entry(parser.storage.key, entry; check),
                     )
                     parser.storage = Storage()
                     parser.task = :free
@@ -579,10 +593,11 @@ function dump!(parser, char, ::Val{:field_number})
                 parser.task = :field_next
             elseif char == rev(parser.storage.delim)
                 entry = make_entry(parser.storage)
+                check = parser.rules_checker
                 push!(
                     parser.content.entries,
                     parser.storage.key =>
-                        BibInternal.make_bibtex_entry(parser.storage.key, entry),
+                        BibInternal.make_bibtex_entry(parser.storage.key, entry; check),
                 )
                 parser.task = :free
             end
@@ -608,9 +623,10 @@ function dump!(parser, char, ::Val{:field_out})
         parser.task = :field_next
     elseif char == rev(parser.storage.delim)
         entry = make_entry(parser.storage)
+        check = parser.rules_checker
         push!(
             parser.content.entries,
-            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry),
+            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry; check),
         )
         parser.storage = Storage()
         parser.task = :free
@@ -641,16 +657,17 @@ function dump!(parser, char, ::Val{:field_next})
         end
     elseif char == rev(parser.storage.delim)
         entry = make_entry(parser.storage)
+        check = parser.rules_checker
         push!(
             parser.content.entries,
-            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry),
+            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry; check),
         )
         parser.storage = Storage()
         parser.task = :free
     end
 end
 
-is_dumped(parser, char, ::Val{:string}) = char ∈ ['=', '@']
+is_dumped(::Parser, char, ::Val{:string}) = char ∈ ['=', '@']
 function dump!(parser, char, ::Val{:string})
     if char == '@'
         parser.task = :entry
@@ -677,7 +694,7 @@ function dump!(parser, char, ::Val{:string})
     end
 end
 
-is_dumped(parser, char, ::Val{:string_inquote}) = char ∈ ['"', '@']
+is_dumped(::Parser, char, ::Val{:string_inquote}) = char ∈ ['"', '@']
 function dump!(parser, char, ::Val{:string_inquote})
     if char == '@'
         parser.task = :entry
@@ -690,7 +707,7 @@ function dump!(parser, char, ::Val{:string_inquote})
     end
 end
 
-is_dumped(parser, char, ::Val{:string_value}) = char ∈ ['"']
+is_dumped(::Parser, char, ::Val{:string_value}) = char ∈ ['"']
 function dump!(parser, char, ::Val{:string_value})
     if char == '"'
         parser.field.value = get_acc(parser; from=2)
@@ -747,8 +764,8 @@ end
 
 Parse a BibTeX string of entries. Raise a detailed warning for each invalid entry.
 """
-function parse_string(str)
-    parser = Parser(str)
+function parse_string(str; check=:error)
+    parser = Parser(str; rules_checker=check)
     foreach(char -> parse!(parser, char), parser.input)
     foreach(error -> warn(error), parser.errors)
     return get_entries(parser)
@@ -759,6 +776,6 @@ end
 
 Parse a BibTeX file located at `path`. Raise a detailed warning for each invalid entry.
 """
-parse_file(path) = parse_string(read(path, String))
+parse_file(path; check=:error) = parse_string(read(path, String); check)
 
 end # module
