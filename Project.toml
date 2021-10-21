@@ -1,7 +1,7 @@
 name = "BibParser"
 uuid = "13533e5b-e1c2-4e57-8cef-cac5e52f6474"
 authors = ["azzaare <jf@baffier.fr>"]
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 BibInternal = "2027ae74-3657-4b95-ae00-e2f7d55c3e64"
@@ -11,8 +11,8 @@ JSONSchema = "7d188eb4-7ad8-530c-ae41-71a32a6d4692"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
-BibInternal = "0.3"
+BibInternal = "0.3.2"
 DataStructures = "0.18"
 JSONSchema = "1"
 YAML = "0.4"
-julia = "1.4"
+julia = "1.6"
