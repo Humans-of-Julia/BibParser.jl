@@ -71,11 +71,12 @@ function parse_file(path; id = "")
         title     = content["title"] # always exists
         id        = isempty(id) ? generate_id(names, title, date.year, access.doi) : id
         in_       = add_in(content)
+        note      = add_note(content)
         fields    = Dict()
         type_     = add_type(content)
 
         BibInternal.Entry(
-            access, names, booktitle, date, editors, eprint, id, in_, fields, title, type_
+            access, names, booktitle, date, editors, eprint, id, in_, fields, note, title, type_
         ), true
     catch err
         if isa(err, YAML.ParserError)
@@ -213,6 +214,13 @@ const CFF_TO_BIBTEX_TYPES = Dict{String, String}(
 """
 function add_type(content)
     get(CFF_TO_BIBTEX_TYPES, content["type"], "misc")
+end
+
+"""
+    add_note(content::Dict{String, Any}) -> String
+"""
+function add_note(content)
+    get(content, "note", "")
 end
 
 """
