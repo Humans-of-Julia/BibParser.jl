@@ -1,15 +1,15 @@
 """
-    Base.iszero(t::Tuple)
+    is_zero(t::Tuple)
 
-Extends `iszero` to `Tuple` types. Return `true` iff all elements of `t` are equal to zero.
+Extends `iszero` as `is_zero` to `Tuple` types. Return `true` iff all elements of `t` are equal to zero.
 """
-Base.iszero(t::Tuple) = all(iszero, t)
+is_zero(t::Tuple) = all(iszero, t)
 
 """
-    Base.occursin(re, char::Char)
-Extends `occursin` to test if a regular expression `re` is a match with a `Char`.
+    occurs_in(re, char::Char)
+Extends `occursin` as `occurs_in` to test if a regular expression `re` is a match with a `Char`.
 """
-Base.occursin(re, char::Char) = occursin(re, string(char))
+occurs_in(re, char::Char) = occursin(re, string(char))
 
 """
     name_to_string(name::BibInternal.Name)

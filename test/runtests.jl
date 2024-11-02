@@ -1,5 +1,17 @@
 using BibParser, BibParser.BibTeX
+
+using Aqua
+using ExplicitImports
+using JET
 using Test
+using TestItemRunner
+
+@testset "Package tests: BibParser" begin
+    include("Aqua.jl")
+    include("ExplicitImports.jl")
+    include("JET.jl")
+    include("TestItemRunner.jl")
+end
 
 const PACKAGE_ROOT = pkgdir(BibParser)
 
@@ -23,14 +35,16 @@ end
 
 @testset "CFF" begin
     files = [
-        ("CITATION.cff",        true),
-        ("invalid_yaml.cff",    false),
+        ("CITATION.cff", true),
+        ("invalid_yaml.cff", false),
         ("invalid_version.cff", false),
-        ("invalid_schema.cff",  false)
+        ("invalid_schema.cff", false)
     ]
     @testset "$file" for (file, expected_result) in files
         parsed, result = parse_file(joinpath(PACKAGE_ROOT, "examples", file), :CFF)
 
+        @info result
+        @info expected_result
         @test result == expected_result
     end
 end

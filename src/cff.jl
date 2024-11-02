@@ -1,18 +1,22 @@
 module CFF
 
-using Dates
-using BibInternal
-using BibParser
-using JSONSchema: Schema, validate
-using YAML
+import Dates: @dateformat_str, Date, Dates
+import BibInternal
+import BibParser
+import JSONSchema: Schema, validate
+import YAML
 
-export parse_file
+function module_path()
+    p0 = pathof(BibParser)
+    p = !isnothing(p0) ? dirname(p0) : @__DIR__
+    return joinpath(p, "..")
+end
 
 const CFF_VERSIONS = Set(["1.2.0"])
-const HELP_URL     = "https://github.com/citation-file-format/citation-file-format/blob/main/schema-guide.md"
-const PACKAGE_ROOT = pkgdir(BibParser)
-const schemas      = Dict{String,Schema}()
-const current_id   = 0
+const HELP_URL = "https://github.com/citation-file-format/citation-file-format/blob/main/schema-guide.md"
+const PACKAGE_ROOT = module_path()
+const schemas = Dict{String, Schema}()
+const current_id = 0
 
 """
 Simple error struct used to abort parsing if the CFF version is not supported or invalid.
@@ -38,14 +42,15 @@ On success, a BibInternal.Entry is returned. On failure, the error object is ret
 """
 function parse_file(path; id = "")
     try
-        content = YAML.load_file(path; dicttype=Dict{String, Any})
+        content = YAML.load_file(path; dicttype = Dict{String, Any})
         cff_version = content["cff-version"]
         if !(cff_version in CFF_VERSIONS)
             throw(UnsupportedCFFVersion(cff_version))
         end
 
         if !haskey(schemas, cff_version)
-            schemas[cff_version] = Schema(read(joinpath(PACKAGE_ROOT, "src", "cff", "schema-$(cff_version).json"), String))
+            schemas[cff_version] = Schema(read(
+                joinpath(PACKAGE_ROOT, "src", "cff", "schema-$(cff_version).json"), String))
         end
 
         errors = validate(content, schemas[cff_version])
@@ -60,23 +65,25 @@ function parse_file(path; id = "")
             content = content["preferred-citation"]
         end
 
-        names     = add_names(content)
-        access    = add_access(content)
+        names = add_names(content)
+        access = add_access(content)
         # no booktitle in CFF
         booktitle = ""
-        date      = add_date(content)
+        date = add_date(content)
         # editors appear only in references in CFF
-        editors   = []
-        eprint    = add_eprint(content)
-        title     = content["title"] # always exists
-        id        = isempty(id) ? generate_id(names, title, date.year, access.doi) : id
-        in_       = add_in(content)
-        fields    = Dict()
-        type_     = add_type(content)
+        editors = []
+        eprint = add_eprint(content)
+        title = content["title"] # always exists
+        id = isempty(id) ? generate_id(names, title, date.year, access.doi) : id
+        in_ = add_in(content)
+        fields = Dict()
+        note = get(content, "note", "")
+        type_ = add_type(content)
 
         BibInternal.Entry(
-            access, names, booktitle, date, editors, eprint, id, in_, fields, title, type_
-        ), true
+            access, names, booktitle, date, editors, eprint, id, in_, fields, note, title, type_
+        ),
+        true
     catch err
         if isa(err, YAML.ParserError)
             print("Parse error invalid YAML: ")
@@ -128,7 +135,8 @@ function add_date(content)
 
     date = Date(date, dateformat"yyyy-mm-dd")
 
-    BibInternal.Date(string(Dates.day(date)), string(Dates.month(date)), string(Dates.year(date)))
+    BibInternal.Date(
+        string(Dates.day(date)), string(Dates.month(date)), string(Dates.year(date)))
 end
 
 """
@@ -145,7 +153,8 @@ end
 """
 function generate_id(names, title, year, doi)
     separator = "-"
-    replace_dict = reduce(merge, map(x -> Dict([x => ""]), collect("-\$£%&(){}+!?/\\:;'\"~#")))
+    replace_dict = reduce(
+        merge, map(x -> Dict([x => ""]), collect("-\$£%&(){}+!?/\\:;'\"~#")))
     replace_dict[' '] = separator
     replace_func = str -> join(map(c -> get(replace_dict, c, "$c"), collect(str)))
 
@@ -171,9 +180,9 @@ end
     add_in(content::Dict{String, Any}) -> BibInternal.In
 """
 function add_in(content)
-    start     = get(content, "start", "")
-    finish    = get(content, "end", "")
-    pages     = start == finish || isempty(finish) ? start : "{$(start)--$(finish)}"
+    start = get(content, "start", "")
+    finish = get(content, "end", "")
+    pages = start == finish || isempty(finish) ? start : "{$(start)--$(finish)}"
     publisher = get(content, "publisher", Dict())
     publisher = get(publisher, "name", "")
 
@@ -182,6 +191,8 @@ function add_in(content)
         "",                                # chapter
         "",                                # edition
         "",                                # institution
+        "",                                # isbn
+        "",                                # issn
         get(content, "journal", ""),
         string(get(content, "issue", "")), # number
         "",                                # organization
@@ -195,17 +206,17 @@ end
 
 const CFF_TO_BIBTEX_TYPES = Dict{String, String}(
     [
-        "article"           => "article",
-        "book"              => "book",
-        "manual"            => "manual",
-        "unpublished"       => "unpublished",
-        "conference"        => "proceedings",
-        "proceedings"       => "proceedings",
-        "conference-paper"  => "proceedings",
-        "magazine-article"  => "article",
-        "newspaper-article" => "article",
-        "pamphlet"          => "booklet"
-    ]
+    "article" => "article",
+    "book" => "book",
+    "manual" => "manual",
+    "unpublished" => "unpublished",
+    "conference" => "proceedings",
+    "proceedings" => "proceedings",
+    "conference-paper" => "proceedings",
+    "magazine-article" => "article",
+    "newspaper-article" => "article",
+    "pamphlet" => "booklet"
+]
 )
 
 """
