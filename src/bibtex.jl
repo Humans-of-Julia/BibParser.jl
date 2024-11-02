@@ -1,7 +1,8 @@
 module BibTeX
 
-using DataStructures
-using BibInternal
+import DataStructures: OrderedDict
+import BibInternal
+import BibParser: occurs_in
 
 export parse_string
 
@@ -25,10 +26,10 @@ Store the different BibTeX elements once succesfully parsed.
 """
 struct Content
     # comments::Dict{Int, String}
-    entries::OrderedDict{String,BibInternal.Entry}
+    entries::OrderedDict{String, BibInternal.Entry}
     # free::Dict{Int, String}
     # preambles::Dict{Int, String}
-    strings::Dict{String,String}
+    strings::Dict{String, String}
 end
 
 """
@@ -41,10 +42,10 @@ Feel free to contribute to more default content.
 """
 function Content()
     # comments = Dict{Int, String}()
-    entries = OrderedDict{String,BibInternal.Entry}()
+    entries = OrderedDict{String, BibInternal.Entry}()
     # free = Dict{Int, String}()
     # preambles = Dict{Int, String}()
-    strings = Dict{String,String}([
+    strings = Dict{String, String}([
         "jan" => "January",
         "feb" => "February",
         "mar" => "March",
@@ -56,7 +57,7 @@ function Content()
         "sep" => "September",
         "oct" => "October",
         "nov" => "November",
-        "dec" => "December",
+        "dec" => "December"
     ])
     return Content(entries, strings)
 end
@@ -110,7 +111,7 @@ Store the content of an entry being parsed.
 - `kind::String`: the kind/type of BibTeX entry
 """
 mutable struct Storage
-    delim::Union{Char,Nothing}
+    delim::Union{Char, Nothing}
     fields::Vector{Field}
     key::String
     kind::String
@@ -232,16 +233,16 @@ mutable struct Parser
     task::Symbol
 
     function Parser(
-        input;
-        acc=Accumulator(1, 0),
-        content=Content(),
-        errors=Vector{BibTeXError}(),
-        field=Field(),
-        pos_start=Position(1, 1),
-        pos_end=Position(1, 0),
-        rules_checker=:error,
-        storage=Storage(),
-        task=:free,
+            input;
+            acc = Accumulator(1, 0),
+            content = Content(),
+            errors = Vector{BibTeXError}(),
+            field = Field(),
+            pos_start = Position(1, 1),
+            pos_end = Position(1, 0),
+            rules_checker = :error,
+            storage = Storage(),
+            task = :free
     )
         return new(
             acc,
@@ -253,7 +254,7 @@ mutable struct Parser
             pos_end,
             rules_checker,
             storage,
-            task,
+            task
         )
     end
 end
@@ -282,7 +283,7 @@ Retrieve the `Accumulator` of the parser.
 - `from`: a positive offset from the start of the `Accumulator`, default to `1`
 - `to`:  a negative offset from the end of the `Accumulator`, default to `0`
 """
-function get_acc(parser; from=1, to=0)
+function get_acc(parser; from = 1, to = 0)
     a = from + parser.acc.from - 1
     b = parser.acc.to - to
     return prod(parser.input[a:b])
@@ -341,7 +342,7 @@ end
 is_dumped(::Parser, char, ::Val{:free}) = char == '@'
 dump!(parser, char, ::Val) = char == '@' && (parser.task = :entry)
 
-is_dumped(::Parser, char, ::Val{:entry}) = occursin(r"[@{\(\n]", char)
+is_dumped(::Parser, char, ::Val{:entry}) = occurs_in(r"[@{\(\n]", char)
 function dump!(parser, char, ::Val{:entry})
     if char == '\n'
         parser.task = :free
@@ -350,7 +351,7 @@ function dump!(parser, char, ::Val{:entry})
         parser.storage = Storage()
     elseif char ∈ ['{', '(']
         set_delim!(parser, char)
-        acc = split(lowercase(get_acc(parser; from=2)), r"[\t ]+")
+        acc = split(lowercase(get_acc(parser; from = 2)), r"[\t ]+")
         if length(acc) ≤ 1 && !isempty(acc[1])
             set_entry_kind!(parser, acc[1])
             # parser.task = acc[1] ∈ ["comment", "preamble", "string"] ? Symbol(acc[1]) : :key
@@ -375,14 +376,14 @@ function dump!(parser, char, ::Val{:key})
         )
         push!(parser.errors, e)
     elseif char == ','
-        acc = split(get_acc(parser; from=2), r"[\t ]+")
+        acc = split(get_acc(parser; from = 2), r"[\t ]+")
         if length(acc) ≤ 1 && !isempty(acc[1])
             parser.storage.key = acc[1]
             parser.task = :field_name
         else
             parser.task = :free
             e = BibTeXError(
-                :invalid_key, get_acc(parser; from=2), parser.pos_start, parser.pos_end
+                :invalid_key, get_acc(parser; from = 2), parser.pos_start, parser.pos_end
             )
             push!(parser.errors, e)
             parser.storage = Storage()
@@ -399,7 +400,7 @@ function dump!(parser, char, ::Val{:field_name})
         )
         push!(parser.errors, e)
     elseif char == '='
-        acc = split(get_acc(parser; from=2), r"[\t\r\n ]+"; keepempty=false)
+        acc = split(get_acc(parser; from = 2), r"[\t\r\n ]+"; keepempty = false)
         if length(acc) == 1
             parser.field.name = acc[1]
             parser.task = :field_in
@@ -407,9 +408,9 @@ function dump!(parser, char, ::Val{:field_name})
             parser.task = :free
             e = BibTeXError(
                 :invalid_field_name,
-                get_acc(parser; from=2),
+                get_acc(parser; from = 2),
                 parser.pos_start,
-                parser.pos_end,
+                parser.pos_end
             )
             push!(parser.errors, e)
             parser.storage = Storage()
@@ -417,7 +418,7 @@ function dump!(parser, char, ::Val{:field_name})
     end
 end
 
-is_dumped(::Parser, char, ::Val{:field_in}) = occursin(r"[0-9@a-zA-Z\"{]", char)
+is_dumped(::Parser, char, ::Val{:field_in}) = occurs_in(r"[0-9@a-zA-Z\"{]", char)
 function dump!(parser, char, ::Val{:field_in})
     if char == '@'
         parser.task = :entry
@@ -432,9 +433,9 @@ function dump!(parser, char, ::Val{:field_in})
     elseif char == '{'
         parser.task = :field_inbrace
         parser.field.braces += 1
-    elseif occursin(r"[0-9]", char)
+    elseif occurs_in(r"[0-9]", char)
         parser.task = :field_number
-    elseif occursin(r"[a-zA-Z]", char)
+    elseif occurs_in(r"[a-zA-Z]", char)
         parser.task = :field_var
     end
 end
@@ -461,7 +462,7 @@ function dump!(parser, char, ::Val{:field_inbrace})
         )
         push!(parser.errors, e)
     elseif char == '}'
-        parser.field.value *= get_acc(parser; from=2)
+        parser.field.value *= get_acc(parser; from = 2)
         push!(parser.storage.fields, deepcopy(parser.field))
         parser.field.value = ""
         parser.task = :field_out
@@ -471,13 +472,13 @@ end
 is_dumped(::Parser, char, ::Val{:field_inquote}) = char ∈ ['{', '"', '}']
 function dump!(parser, char, ::Val{:field_inquote})
     if char == '"' && parser.field.braces == 0
-        parser.field.value *= get_acc(parser; from=2)
+        parser.field.value *= get_acc(parser; from = 2)
         parser.task = :field_outquote
     elseif char == '{'
-        parser.field.value *= get_acc(parser; from=2) # * parser.field.value
+        parser.field.value *= get_acc(parser; from = 2) # * parser.field.value
         parser.field.braces += 1
     elseif char == '}'
-        parser.field.value *= get_acc(parser; from=1, to=-1) # * parser.field.value
+        parser.field.value *= get_acc(parser; from = 1, to = -1) # * parser.field.value
         parser.field.braces -= 1
     end
 end
@@ -504,8 +505,8 @@ function dump!(parser, char, ::Val{:field_outquote})
             check = parser.rules_checker
             push!(
                 parser.content.entries,
-                parser.storage.key =>
-                    BibInternal.make_bibtex_entry(parser.storage.key, entry; check),
+                parser.storage.key => BibInternal.make_bibtex_entry(
+                    parser.storage.key, entry; check)
             )
             parser.storage = Storage()
             parser.task = :free
@@ -513,7 +514,7 @@ function dump!(parser, char, ::Val{:field_outquote})
     end
 end
 
-is_dumped(::Parser, char, ::Val{:field_concat}) = occursin(r"[a-zA-Z\"@]", char)
+is_dumped(::Parser, char, ::Val{:field_concat}) = occurs_in(r"[a-zA-Z\"@]", char)
 function dump!(parser, char, ::Val{:field_concat})
     if char == '@'
         parser.task = :entry
@@ -525,7 +526,7 @@ function dump!(parser, char, ::Val{:field_concat})
         parser.pos_start.col += 1
         parser.acc.from += 1
         parser.task = :field_inquote
-    elseif occursin(r"[a-zA-Z]", char)
+    elseif occurs_in(r"[a-zA-Z]", char)
         parser.task = :field_var
     end
 end
@@ -541,7 +542,7 @@ function dump!(parser, char, ::Val{:field_var})
         )
         push!(parser.errors, e)
     else
-        acc = split(get_acc(parser), r"[\t\r\n ]+"; keepempty=false)
+        acc = split(get_acc(parser), r"[\t\r\n ]+"; keepempty = false)
         if length(acc) == 1
             parser.field.value *= parser.content.strings[acc[1]]
             if char == '#'
@@ -556,8 +557,8 @@ function dump!(parser, char, ::Val{:field_var})
                     check = parser.rules_checker
                     push!(
                         parser.content.entries,
-                        parser.storage.key =>
-                            BibInternal.make_bibtex_entry(parser.storage.key, entry; check),
+                        parser.storage.key => BibInternal.make_bibtex_entry(
+                            parser.storage.key, entry; check)
                     )
                     parser.storage = Storage()
                     parser.task = :free
@@ -583,7 +584,7 @@ function dump!(parser, char, ::Val{:field_number})
         )
         push!(parser.errors, e)
     else
-        acc = split(get_acc(parser), r"[\t\r\n ]+"; keepempty=false)
+        acc = split(get_acc(parser), r"[\t\r\n ]+"; keepempty = false)
         # @show acc
         if length(acc) == 1
             parser.field.value = acc[1]
@@ -596,8 +597,8 @@ function dump!(parser, char, ::Val{:field_number})
                 check = parser.rules_checker
                 push!(
                     parser.content.entries,
-                    parser.storage.key =>
-                        BibInternal.make_bibtex_entry(parser.storage.key, entry; check),
+                    parser.storage.key => BibInternal.make_bibtex_entry(
+                        parser.storage.key, entry; check)
                 )
                 parser.task = :free
             end
@@ -626,7 +627,8 @@ function dump!(parser, char, ::Val{:field_out})
         check = parser.rules_checker
         push!(
             parser.content.entries,
-            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry; check),
+            parser.storage.key => BibInternal.make_bibtex_entry(
+                parser.storage.key, entry; check)
         )
         parser.storage = Storage()
         parser.task = :free
@@ -642,7 +644,7 @@ function dump!(parser, char, ::Val{:field_next})
         )
         push!(parser.errors, e)
     elseif char == '='
-        acc = split(get_acc(parser; from=2), r"[\t\r\n ]+"; keepempty=false)
+        acc = split(get_acc(parser; from = 2), r"[\t\r\n ]+"; keepempty = false)
         # @show acc
         if length(acc) == 1
             parser.field.name = acc[1]
@@ -660,7 +662,8 @@ function dump!(parser, char, ::Val{:field_next})
         check = parser.rules_checker
         push!(
             parser.content.entries,
-            parser.storage.key => BibInternal.make_bibtex_entry(parser.storage.key, entry; check),
+            parser.storage.key => BibInternal.make_bibtex_entry(
+                parser.storage.key, entry; check)
         )
         parser.storage = Storage()
         parser.task = :free
@@ -676,7 +679,7 @@ function dump!(parser, char, ::Val{:string})
         )
         push!(parser.errors, e)
     elseif char == '='
-        acc = split(get_acc(parser; from=2), r"[\t\r\n ]+"; keepempty=false)
+        acc = split(get_acc(parser; from = 2), r"[\t\r\n ]+"; keepempty = false)
         if length(acc) == 1
             parser.field.name = acc[1]
             parser.task = :string_inquote
@@ -684,9 +687,9 @@ function dump!(parser, char, ::Val{:string})
             parser.task = :free
             e = BibTeXError(
                 :invalid_string,
-                get_acc(parser; from=2, to=-1),
+                get_acc(parser; from = 2, to = -1),
                 parser.pos_start,
-                parser.pos_end,
+                parser.pos_end
             )
             push!(parser.errors, e)
             parser.storage = Storage()
@@ -710,7 +713,7 @@ end
 is_dumped(::Parser, char, ::Val{:string_value}) = char ∈ ['"']
 function dump!(parser, char, ::Val{:string_value})
     if char == '"'
-        parser.field.value = get_acc(parser; from=2)
+        parser.field.value = get_acc(parser; from = 2)
         parser.task = :string_outquote
     end
 end
@@ -742,7 +745,7 @@ is_dumped(parser, char) = is_dumped(parser, char, Val(parser.task))
 
 Dump the content of the parser `Accumulator` into the parser `Content`. Dispatch to the appropriate `dump!` method according to the state of the parser.
 """
-function dump!(parser, char=' ')
+function dump!(parser, char = ' ')
     dump!(parser, char, Val(parser.task))
     parser.pos_start = deepcopy(parser.pos_end)
     return parser.acc.from = parser.acc.to
@@ -764,8 +767,8 @@ end
 
 Parse a BibTeX string of entries. Raise a detailed warning for each invalid entry.
 """
-function parse_string(str; check=:error)
-    parser = Parser(str; rules_checker=check)
+function parse_string(str; check = :error)
+    parser = Parser(str; rules_checker = check)
     foreach(char -> parse!(parser, char), parser.input)
     foreach(error -> warn(error), parser.errors)
     return get_entries(parser)
@@ -776,6 +779,6 @@ end
 
 Parse a BibTeX file located at `path`. Raise a detailed warning for each invalid entry.
 """
-parse_file(path; check=:error) = parse_string(read(path, String); check)
+parse_file(path; check = :error) = parse_string(read(path, String); check)
 
 end # module

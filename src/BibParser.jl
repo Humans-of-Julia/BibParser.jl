@@ -1,5 +1,7 @@
 module BibParser
 
+import TestItems: @testitem
+
 export parse_entry
 export parse_file
 
@@ -25,7 +27,7 @@ For bibliography formats with formatting rules (such as `:BibTeX`), the `check` 
 parse_file(path, ::Val{:BibTeX}; check) = BibTeX.parse_file(path; check)
 parse_file(path, ::Val{:CFF}; check) = CFF.parse_file(path)
 
-parse_file(path, parser=:BibTeX; check=:error) = parse_file(path, Val(parser); check)
+parse_file(path, parser = :BibTeX; check = :error) = parse_file(path, Val(parser); check)
 
 """
     parse_entry(entry::String; parser::Symbol = :BibTeX, check = :error)
@@ -33,7 +35,7 @@ Parse a string entry. Default to BibTeX format. No other options available yet (
 
 For bibliography formats with formatting rules (such as `:BibTeX`), the `check` keyword argument can be set to `:none` (or `nothing`), `:warn`, or `:error`.
 """
-function parse_entry(entry; parser=:BibTeX, check = :error)
+function parse_entry(entry; parser = :BibTeX, check = :error)
     return parser == :BibTeX && return BibTeX.parse_string(entry; check)
 end
 

@@ -3,7 +3,7 @@ using Documenter, BibParser, BibInternal
 makedocs(
     sitename = "BibParser.jl",
     authors = "Jean-François BAFFIER",
-    repo="https://github.com/Humans-of-Julia/BibParser.jl/blob/{commit}{path}#L{line}",
+    repo = "https://github.com/Humans-of-Julia/BibParser.jl/blob/{commit}{path}#L{line}",
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true"
     ),
@@ -12,7 +12,7 @@ makedocs(
         "BibTeX" => "bibtex.md",
         # "BibTeX - automa" => "bibtex_automa.md",
         "CSL-JSON" => "csl.md",
-        "Internal" => "internal.md",
+        "Internal" => "internal.md"
     ]
 )
 
