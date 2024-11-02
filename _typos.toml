@@ -4,7 +4,10 @@ inbrace = "inbrace"
 BA = "BA"
 FO = "FO"
 ND = "ND"
-iMatix = "iMatix"
+
+[default.extend-ignore-re]
+# Ignore the company name iMatix
+"iMatix" = "iMatix"
 
 [default.extend-identifiers]
 "CC-BY-NC-ND-1.0" = "CC-BY-NC-ND-1.0"
