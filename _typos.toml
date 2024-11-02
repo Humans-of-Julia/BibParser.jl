@@ -1,13 +1,14 @@
+[default]
+extend-ignore-re = [
+    "iMatix"
+]
+
 [default.extend-words]
 annote = "annote"
 inbrace = "inbrace"
 BA = "BA"
 FO = "FO"
 ND = "ND"
-
-[default.extend-ignore-re]
-# Ignore the company name iMatix
-"iMatix" = "iMatix"
 
 [default.extend-identifiers]
 "CC-BY-NC-ND-1.0" = "CC-BY-NC-ND-1.0"
