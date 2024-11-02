@@ -1,3 +1,8 @@
 [default.extend-words]
 # Don't correct the surname "Teh"
 annote = "annote"
+inbrace = "inbrace"
+ba = "BA"
+fo = "FO"
+nd = "ND"
+imatix = "iMatix"

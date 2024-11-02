@@ -19,7 +19,7 @@ end
 """
     Content
 
-Store the different BibTeX elements once succesfully parsed.
+Store the different BibTeX elements once successfully parsed.
 
 !!! warning "Note:"
     Free text, comments entries and preambles entries are currently ignored.
@@ -269,7 +269,7 @@ rev(char) = char == '(' ? ')' : '}'
 """
     get_entries(parser)
 
-Retrieve the entries succesfully parsed by `parser`.
+Retrieve the entries successfully parsed by `parser`.
 """
 get_entries(parser) = parser.content.entries
 
