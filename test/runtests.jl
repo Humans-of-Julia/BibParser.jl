@@ -9,7 +9,7 @@ using TestItemRunner
 @testset "Package tests: BibParser" begin
     include("Aqua.jl")
     include("ExplicitImports.jl")
-    include("JET.jl")
+    # include("JET.jl") # FIXME - update for julia 1.12
     include("TestItemRunner.jl")
 end
 
