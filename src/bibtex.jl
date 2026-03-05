@@ -277,13 +277,25 @@ get_entries(parser) = parser.content.entries
     finalize_entry!(parser)
 
 Finalize the current parsed entry and store it in parser content.
+Duplicate keys are handled according to parser `rules_checker`:
+- `:error`: throw an error
+- `:warn`: emit a warning and keep first occurrence
+- `:none`: silently keep first occurrence
 """
 function finalize_entry!(parser)
     key = parser.storage.key
-    entry = make_entry(parser.storage)
     check = parser.rules_checker
-    bibentry = BibInternal.make_bibtex_entry(key, entry; check)
-    push!(parser.content.entries, key => bibentry)
+    if haskey(parser.content.entries, key)
+        if check == :error
+            error("Duplicate BibTeX entry key detected: '$key'")
+        elseif check == :warn
+            @warn "Duplicate BibTeX entry key detected: '$key'. Keeping first entry."
+        end
+    else
+        entry = make_entry(parser.storage)
+        bibentry = BibInternal.make_bibtex_entry(key, entry; check)
+        push!(parser.content.entries, key => bibentry)
+    end
     parser.storage = Storage()
     parser.task = :free
     return nothing
