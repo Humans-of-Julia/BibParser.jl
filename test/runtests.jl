@@ -32,16 +32,34 @@ const PACKAGE_ROOT = pkgdir(BibParser)
         end
     end
 
-    @testset "duplicate keys" begin
-        @test_throws "Duplicate BibTeX entry key detected" parse_file(joinpath(PACKAGE_ROOT, "examples", "duplicate_keys.bib"))
+    @testset "duplicate keys error (#57)" begin
+        duplicate_keys_str = """
+        @article{Key,
+            author   = "Author1",
+            title    = "Title1",
+            journal  = "Journal1",
+            year     = 1901,
+            volume   = "1",
+            number   = "1",
+        }
 
-        parsed = @test_logs (:warn, r"Duplicate BibTeX entry key detected") parse_file(
-            joinpath(PACKAGE_ROOT, "examples", "duplicate_keys.bib"); check = :warn
-        )
+        @article{Key,
+            author   = "Author2",
+            title    = "Title2",
+            journal  = "Journal2",
+            year     = 1902,
+            volume   = "2",
+            number   = "2",
+        }
+        """
+
+        @test_throws "Duplicate BibTeX entry key detected" parse_entry(duplicate_keys_str)
+
+        parsed = @test_logs (:warn, r"Duplicate BibTeX entry key detected") parse_entry(duplicate_keys_str; check = :warn)
         @test haskey(parsed, "Key")
         @test parsed["Key"].title == "Title1" # first occurrence is kept
 
-        parsed = @test_logs parse_file(joinpath(PACKAGE_ROOT, "examples", "duplicate_keys.bib"); check = :none)
+        parsed = @test_logs parse_entry(duplicate_keys_str; check = :none)
         @test haskey(parsed, "Key")
         @test parsed["Key"].title == "Title1" # first occurrence is kept
     end
