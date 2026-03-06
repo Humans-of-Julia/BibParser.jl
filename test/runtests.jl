@@ -66,7 +66,6 @@ const PACKAGE_ROOT = pkgdir(BibParser)
         @test isempty(parsed["Javanainen1988"].in.isbn)
     end
 
-
     @testset "duplicate keys error (#57)" begin
         bib_str = """
         @article{Key,
@@ -90,7 +89,8 @@ const PACKAGE_ROOT = pkgdir(BibParser)
 
         @test_throws "Duplicate BibTeX entry key detected" parse_entry(bib_str)
 
-        parsed = @test_logs (:warn, r"Duplicate BibTeX entry key detected") parse_entry(bib_str; check = :warn)
+        parsed = @test_logs (:warn, r"Duplicate BibTeX entry key detected") parse_entry(
+            bib_str; check = :warn)
         @test haskey(parsed, "Key")
         @test parsed["Key"].title == "Title1" # first occurrence is kept
 
