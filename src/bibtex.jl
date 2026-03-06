@@ -717,6 +717,7 @@ function dump!(parser, char, ::Val{:string_outquote})
         push!(parser.errors, e)
     elseif char == rev(parser.storage.delim)
         parser.content.strings[parser.field.name] = parser.field.value
+        parser.field = Field()
         parser.task = :free
         parser.storage = Storage()
     end

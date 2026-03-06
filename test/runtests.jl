@@ -98,6 +98,25 @@ const PACKAGE_ROOT = pkgdir(BibParser)
         @test haskey(parsed, "Key")
         @test parsed["Key"].title == "Title1" # first occurrence is kept
     end
+
+    @testset "BibTeX @string does not leak into next field (#32)" begin
+        bib = """
+        @string{zp = "Z. Phys."}
+
+        @mastersthesis{GoerzDiploma2010,
+            Author = {Goerz, Michael},
+            Title = {Optimization of a Controlled Phasegate for Ultracold Calcium Atoms in an Optical Lattice},
+            School = {Freie Universität Berlin},
+            type = {{Diplomarbeit}},
+            url = {http://michaelgoerz.net/research/diploma_thesis.pdf},
+            Year = {2010},
+        }
+        """
+        parsed = parse_entry(bib)
+        first_author = parsed["GoerzDiploma2010"].authors[1]
+        @test first_author.last == "Goerz"
+        @test first_author.first == "Michael"
+    end
 end
 
 @testset "CFF" begin
