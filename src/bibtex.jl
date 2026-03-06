@@ -274,6 +274,34 @@ Retrieve the entries successfully parsed by `parser`.
 get_entries(parser) = parser.content.entries
 
 """
+    finalize_entry!(parser)
+
+Finalize the current parsed entry and store it in parser content.
+Duplicate keys are handled according to parser `rules_checker`:
+- `:error`: throw an error
+- `:warn`: emit a warning and keep first occurrence
+- `:none`: silently keep first occurrence
+"""
+function finalize_entry!(parser)
+    key = parser.storage.key
+    check = parser.rules_checker
+    if haskey(parser.content.entries, key)
+        if check == :error
+            error("Duplicate BibTeX entry key detected: '$key'")
+        elseif check == :warn
+            @warn "Duplicate BibTeX entry key detected: '$key'. Keeping first entry."
+        end
+    else
+        entry = make_entry(parser.storage)
+        bibentry = BibInternal.make_bibtex_entry(key, entry; check)
+        push!(parser.content.entries, key => bibentry)
+    end
+    parser.storage = Storage()
+    parser.task = :free
+    return nothing
+end
+
+"""
     get_acc(parser; from = 1, to = 0)
 
 Retrieve the `Accumulator` of the parser.
@@ -501,15 +529,7 @@ function dump!(parser, char, ::Val{:field_outquote})
         if char == ','
             parser.task = :field_next
         elseif char == rev(parser.storage.delim)
-            entry = make_entry(parser.storage)
-            check = parser.rules_checker
-            push!(
-                parser.content.entries,
-                parser.storage.key => BibInternal.make_bibtex_entry(
-                    parser.storage.key, entry; check)
-            )
-            parser.storage = Storage()
-            parser.task = :free
+            finalize_entry!(parser)
         end
     end
 end
@@ -553,15 +573,7 @@ function dump!(parser, char, ::Val{:field_var})
                 if char == ','
                     parser.task = :field_next
                 elseif char == rev(parser.storage.delim)
-                    entry = make_entry(parser.storage)
-                    check = parser.rules_checker
-                    push!(
-                        parser.content.entries,
-                        parser.storage.key => BibInternal.make_bibtex_entry(
-                            parser.storage.key, entry; check)
-                    )
-                    parser.storage = Storage()
-                    parser.task = :free
+                    finalize_entry!(parser)
                 end
             end
         else
@@ -593,14 +605,7 @@ function dump!(parser, char, ::Val{:field_number})
             if char == ','
                 parser.task = :field_next
             elseif char == rev(parser.storage.delim)
-                entry = make_entry(parser.storage)
-                check = parser.rules_checker
-                push!(
-                    parser.content.entries,
-                    parser.storage.key => BibInternal.make_bibtex_entry(
-                        parser.storage.key, entry; check)
-                )
-                parser.task = :free
+                finalize_entry!(parser)
             end
         else
             parser.task = :free
@@ -623,15 +628,7 @@ function dump!(parser, char, ::Val{:field_out})
     elseif char == ','
         parser.task = :field_next
     elseif char == rev(parser.storage.delim)
-        entry = make_entry(parser.storage)
-        check = parser.rules_checker
-        push!(
-            parser.content.entries,
-            parser.storage.key => BibInternal.make_bibtex_entry(
-                parser.storage.key, entry; check)
-        )
-        parser.storage = Storage()
-        parser.task = :free
+        finalize_entry!(parser)
     end
 end
 
@@ -658,15 +655,7 @@ function dump!(parser, char, ::Val{:field_next})
             parser.storage = Storage()
         end
     elseif char == rev(parser.storage.delim)
-        entry = make_entry(parser.storage)
-        check = parser.rules_checker
-        push!(
-            parser.content.entries,
-            parser.storage.key => BibInternal.make_bibtex_entry(
-                parser.storage.key, entry; check)
-        )
-        parser.storage = Storage()
-        parser.task = :free
+        finalize_entry!(parser)
     end
 end
 
