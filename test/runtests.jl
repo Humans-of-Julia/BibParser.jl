@@ -32,8 +32,43 @@ const PACKAGE_ROOT = pkgdir(BibParser)
         end
     end
 
+    @testset "don't copy fields from previous entries (#28)" begin
+        bib_str = """
+        @book{FroeseFischer1997,
+            Address =      {Bristol, UK Philadelphia, Penn},
+            Author =       {Froese Fischer, Charlotte and Brage, Tomas and
+                            Jönsson, Per},
+            Isbn =         {0-7503-0466-9},
+            Publisher =    {Institute of Physics Publ},
+            Title =        {Computational atomic structure : an {MCHF} approach},
+            Year =         1997,
+        }
+
+        @article{Javanainen1988,
+            author =       {J. Javanainen and J. H. Eberly and Qichang Su},
+            title =        {Numerical Simulations of Multiphoton Ionization and
+                            Above-Threshold Electron Spectra},
+            journal =      {Physical Review A},
+            volume =       38,
+            number =       7,
+            pages =        {3430-3446},
+            year =         1988,
+            doi =          {10.1103/physreva.38.3430},
+            url =          {http://dx.doi.org/10.1103/PhysRevA.38.3430},
+        }
+        """
+
+        parsed = parse_entry(bib_str)
+        @test haskey(parsed, "FroeseFischer1997")
+        @test haskey(parsed, "Javanainen1988")
+        @test parsed["FroeseFischer1997"].authors != parsed["Javanainen1988"].authors
+        @test parsed["FroeseFischer1997"].in.isbn == "0-7503-0466-9"
+        @test isempty(parsed["Javanainen1988"].in.isbn)
+    end
+
+
     @testset "duplicate keys error (#57)" begin
-        duplicate_keys_str = """
+        bib_str = """
         @article{Key,
             author   = "Author1",
             title    = "Title1",
@@ -53,13 +88,13 @@ const PACKAGE_ROOT = pkgdir(BibParser)
         }
         """
 
-        @test_throws "Duplicate BibTeX entry key detected" parse_entry(duplicate_keys_str)
+        @test_throws "Duplicate BibTeX entry key detected" parse_entry(bib_str)
 
-        parsed = @test_logs (:warn, r"Duplicate BibTeX entry key detected") parse_entry(duplicate_keys_str; check = :warn)
+        parsed = @test_logs (:warn, r"Duplicate BibTeX entry key detected") parse_entry(bib_str; check = :warn)
         @test haskey(parsed, "Key")
         @test parsed["Key"].title == "Title1" # first occurrence is kept
 
-        parsed = @test_logs parse_entry(duplicate_keys_str; check = :none)
+        parsed = @test_logs parse_entry(bib_str; check = :none)
         @test haskey(parsed, "Key")
         @test parsed["Key"].title == "Title1" # first occurrence is kept
     end
