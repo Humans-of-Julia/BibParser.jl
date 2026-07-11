@@ -117,6 +117,42 @@ const PACKAGE_ROOT = pkgdir(BibParser)
         @test first_author.last == "Goerz"
         @test first_author.first == "Michael"
     end
+
+    @testset "lossless BibTeX document preserves top-level blocks" begin
+        bib = """
+        Free text before entries.
+
+        @string{jcp = "J. Chem. Phys."}
+
+        @preamble{"\\newcommand{\\noop}[1]{}"}
+
+        @comment{This comment should survive parsing.}
+
+        @article{Key,
+          author = {Lovelace, Ada},
+          title = {Computing},
+          journal = jcp,
+          year = {1843}
+        }
+
+        Free text after entries.
+        """
+
+        document = parse_bibliography(bib; format = :BibTeX)
+        @test document.format == :BibTeX
+        @test length(document.entries) == 1
+        @test document.entries[1].id == "Key"
+        @test document.entries[1].raw.kind == "article"
+        @test document.entries[1].raw.key == "Key"
+        @test any(
+            field -> field.name == "title" && field.value == "Computing",
+            document.entries[1].raw.fields
+        )
+        @test :string in map(block -> block.kind, document.blocks)
+        @test :preamble in map(block -> block.kind, document.blocks)
+        @test :comment in map(block -> block.kind, document.blocks)
+        @test count(block -> block.kind == :free, document.blocks) == 2
+    end
 end
 
 @testset "CFF" begin

@@ -5,6 +5,7 @@ import BibInternal
 import BibParser: occurs_in
 
 export parse_string
+export parse_document
 
 """
     mutable struct Accumulator
@@ -770,5 +771,204 @@ end
 Parse a BibTeX file located at `path`. Raise a detailed warning for each invalid entry.
 """
 parse_file(path; check = :error) = parse_string(read(path, String); check)
+
+function _source_span(input::String, start::Int, stop::Int)
+    prefix = start == firstindex(input) ? "" : input[firstindex(input):prevind(input, start)]
+    body = input[start:stop]
+    start_line = count(==('\n'), prefix) + 1
+    last_newline = findlast(==('\n'), prefix)
+    start_column = isnothing(last_newline) ? length(prefix) + 1 :
+                   length(prefix[nextind(prefix, last_newline):end]) + 1
+    end_line = start_line + count(==('\n'), body)
+    body_newline = findlast(==('\n'), body)
+    end_column = isnothing(body_newline) ? start_column + length(body) - 1 :
+                 length(body[nextind(body, body_newline):end]) + 1
+    return BibInternal.SourceSpan(
+        start_line = start_line,
+        start_column = start_column,
+        end_line = end_line,
+        end_column = end_column,
+    )
+end
+
+function _entry_end(input::String, open_index::Int, open_char::Char)
+    close_char = rev(open_char)
+    depth = 1
+    inquote = false
+    escaped = false
+    index = nextind(input, open_index)
+    while index <= lastindex(input)
+        char = input[index]
+        if char == '"' && !escaped
+            inquote = !inquote
+        elseif !inquote && char == open_char
+            depth += 1
+        elseif !inquote && char == close_char
+            depth -= 1
+            depth == 0 && return index
+        end
+        escaped = char == '\\' && !escaped
+        char == '\\' || (escaped = false)
+        index = nextind(input, index)
+    end
+    return lastindex(input)
+end
+
+function _header(raw::String)
+    m = match(r"(?is)^\s*@\s*([A-Za-z]+)\s*([\{\(])", raw)
+    isnothing(m) && return "", nothing
+    return lowercase(m.captures[1]), only(m.captures[2])
+end
+
+function _body(raw::String)
+    kind, open_char = _header(raw)
+    isempty(kind) && return ""
+    start = findfirst(open_char, raw)
+    isnothing(start) && return ""
+    stop = findlast(rev(open_char), raw)
+    isnothing(stop) || stop <= start ? "" : raw[nextind(raw, start):prevind(raw, stop)]
+end
+
+function _entry_key(raw::String)
+    body = _body(raw)
+    comma = findfirst(==(','), body)
+    isnothing(comma) && return strip(body)
+    return strip(body[begin:prevind(body, comma)])
+end
+
+function _field_chunks(body::AbstractString)
+    chunks = String[]
+    start = firstindex(body)
+    depth = 0
+    inquote = false
+    escaped = false
+    for index in eachindex(body)
+        char = body[index]
+        if char == '"' && !escaped
+            inquote = !inquote
+        elseif !inquote && char in ['{', '(']
+            depth += 1
+        elseif !inquote && char in ['}', ')']
+            depth = max(depth - 1, 0)
+        elseif !inquote && depth == 0 && char == ','
+            push!(chunks, body[start:prevind(body, index)])
+            start = nextind(body, index)
+        end
+        escaped = char == '\\' && !escaped
+        char == '\\' || (escaped = false)
+    end
+    start <= lastindex(body) && push!(chunks, body[start:end])
+    return chunks
+end
+
+function _raw_fields(raw::String)
+    body = _body(raw)
+    comma = findfirst(==(','), body)
+    isnothing(comma) && return BibInternal.RawField[]
+    field_body = strip(body[nextind(body, comma):end])
+    raw_fields = BibInternal.RawField[]
+    for chunk in _field_chunks(field_body)
+        stripped = strip(chunk)
+        isempty(stripped) && continue
+        eq = findfirst(==('='), stripped)
+        isnothing(eq) && continue
+        name = strip(stripped[begin:prevind(stripped, eq)])
+        value = strip(stripped[nextind(stripped, eq):end])
+        if !isempty(value) && first(value) in ['{', '"'] && last(value) in ['}', '"']
+            value = value[nextind(value, firstindex(value)):prevind(value, lastindex(value))]
+        end
+        push!(raw_fields, BibInternal.RawField(name = name, value = value, raw = stripped))
+    end
+    return raw_fields
+end
+
+function _block_kind(kind::String)
+    kind == "string" && return :string
+    kind == "comment" && return :comment
+    kind == "preamble" && return :preamble
+    return :entry
+end
+
+function parse_document(input::String; check = :error, format::Symbol = :BibTeX)
+    entries = BibInternal.LosslessEntry[]
+    blocks = BibInternal.RawBlock[]
+    diagnostics = BibInternal.Diagnostic[]
+    parsed_entries = parse_string(input; check)
+    cursor = firstindex(input)
+    while cursor <= lastindex(input)
+        at = findnext(==('@'), input, cursor)
+        if isnothing(at)
+            raw = input[cursor:end]
+            isempty(strip(raw)) || push!(blocks, BibInternal.RawBlock(kind = :free, raw = raw))
+            break
+        end
+        if at > cursor
+            raw = input[cursor:prevind(input, at)]
+            isempty(strip(raw)) || push!(
+                blocks,
+                BibInternal.RawBlock(
+                    kind = :free,
+                    raw = raw,
+                    span = _source_span(input, cursor, prevind(input, at))
+                )
+            )
+        end
+        open_at = findnext(c -> c in ['{', '('], input, at)
+        if isnothing(open_at)
+            raw = input[at:end]
+            push!(blocks, BibInternal.RawBlock(kind = :free, raw = raw, span = _source_span(input, at, lastindex(input))))
+            break
+        end
+        stop = _entry_end(input, open_at, input[open_at])
+        raw = input[at:stop]
+        kind, _ = _header(raw)
+        block_kind = _block_kind(kind)
+        span = _source_span(input, at, stop)
+        if block_kind == :entry
+            try
+                key = _entry_key(raw)
+                entry = get(parsed_entries, key, nothing)
+                if !isnothing(entry)
+                    raw_entry = BibInternal.RawEntry(
+                        kind = kind,
+                        key = key,
+                        fields = _raw_fields(raw),
+                        raw = raw,
+                        span = span,
+                    )
+                    push!(entries, BibInternal.LosslessEntry(entry, raw_entry))
+                end
+            catch err
+                diagnostic = BibInternal.Diagnostic(
+                    code = :parse_error,
+                    severity = BibInternal.diagnostic_error,
+                    message = sprint(showerror, err),
+                    span = span,
+                    entry_id = _entry_key(raw),
+                    suggestion = "Fix the BibTeX entry or parse with a more permissive check level."
+                )
+                push!(diagnostics, diagnostic)
+                check == :error && rethrow()
+            end
+        else
+            push!(
+                blocks,
+                BibInternal.RawBlock(
+                    kind = block_kind,
+                    key = kind == "string" ? _entry_key(raw) : "",
+                    raw = raw,
+                    span = span,
+                )
+            )
+        end
+        cursor = nextind(input, stop)
+    end
+    return BibInternal.BibliographyDocument(
+        format = format,
+        entries = entries,
+        blocks = blocks,
+        diagnostics = diagnostics,
+    )
+end
 
 end # module
