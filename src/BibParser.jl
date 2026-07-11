@@ -21,6 +21,14 @@ using .CSL: CSL
 include("cff.jl")
 using .CFF: CFF
 
+# RIS module
+include("ris.jl")
+using .RIS: RIS
+
+# XML bibliography formats
+include("xml.jl")
+using .XMLFormats: XMLFormats
+
 """
     parse_file(path::String, parser::Symbol = :BibTeX; check=:error)
 Parse a bibliography file. Default to BibTeX format. Other options available: CFF (CSL-JSON coming soon).
@@ -30,6 +38,9 @@ parse_file(path, ::Val{:BibTeX}; check) = BibTeX.parse_file(path; check)
 parse_file(path, ::Val{:BibLaTeX}; check) = BibTeX.parse_file(path; check = :none)
 parse_file(path, ::Val{:CFF}; check) = CFF.parse_file(path)
 parse_file(path, ::Val{:CSL}; check) = CSL.parse_document(read(path, String)).entries
+parse_file(path, ::Val{:RIS}; check) = RIS.parse_document(read(path, String)).entries
+parse_file(path, ::Val{:EndNote}; check) = XMLFormats.parse_endnote_document(read(path, String)).entries
+parse_file(path, ::Val{:MODS}; check) = XMLFormats.parse_mods_document(read(path, String)).entries
 
 parse_file(path, parser = :BibTeX; check = :error) = parse_file(path, Val(parser); check)
 
@@ -68,6 +79,15 @@ parse_bibliography(input, ::Val{:CFF}; check = :error) =
 
 parse_bibliography(input, ::Val{:CSL}; check = :error) =
     CSL.parse_document(_read_input(input))
+
+parse_bibliography(input, ::Val{:RIS}; check = :error) =
+    RIS.parse_document(_read_input(input))
+
+parse_bibliography(input, ::Val{:EndNote}; check = :error) =
+    XMLFormats.parse_endnote_document(_read_input(input))
+
+parse_bibliography(input, ::Val{:MODS}; check = :error) =
+    XMLFormats.parse_mods_document(_read_input(input))
 
 """
     parse_entry(entry::String; parser::Symbol = :BibTeX, check = :error)

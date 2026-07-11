@@ -211,3 +211,94 @@ end
     @test entry.date.year == "1843"
     @test entry.in.journal == "Notes"
 end
+
+@testset "RIS" begin
+    ris = """
+    TY  - JOUR
+    ID  - lovelace1843
+    AU  - Lovelace, Ada
+    TI  - Computing
+    JO  - Notes
+    PY  - 1843/1/1
+    VL  - 1
+    IS  - 2
+    SP  - 1
+    EP  - 10
+    DO  - 10.0000/example
+    UR  - https://example.test/paper
+    ER  -
+    """
+    document = parse_bibliography(ris; format = :RIS)
+    @test document.format == :RIS
+    @test isempty(document.diagnostics)
+    @test length(document.entries) == 1
+    entry = document.entries[1]
+    @test entry.id == "lovelace1843"
+    @test entry.type == "article"
+    @test entry.authors[1].last == "Lovelace"
+    @test entry.date.year == "1843"
+    @test entry.in.pages == "1--10"
+end
+
+@testset "EndNote XML" begin
+    xml = """
+    <xml>
+      <records>
+        <record>
+          <rec-number>42</rec-number>
+          <ref-type>Journal Article</ref-type>
+          <contributors>
+            <authors><author><style>Lovelace, Ada</style></author></authors>
+          </contributors>
+          <titles>
+            <title><style>Computing</style></title>
+            <secondary-title><style>Notes</style></secondary-title>
+          </titles>
+          <dates><year><style>1843</style></year></dates>
+          <volume><style>1</style></volume>
+          <number><style>2</style></number>
+          <pages><style>1-10</style></pages>
+          <electronic-resource-num><style>10.0000/example</style></electronic-resource-num>
+          <urls><related-urls><url><style>https://example.test/paper</style></url></related-urls></urls>
+        </record>
+      </records>
+    </xml>
+    """
+    document = parse_bibliography(xml; format = :EndNote)
+    @test document.format == :EndNote
+    @test isempty(document.diagnostics)
+    @test length(document.entries) == 1
+    entry = document.entries[1]
+    @test entry.id == "42"
+    @test entry.type == "article"
+    @test entry.title == "Computing"
+    @test entry.in.journal == "Notes"
+end
+
+@testset "MODS" begin
+    mods = """
+    <modsCollection xmlns="http://www.loc.gov/mods/v3">
+      <mods>
+        <genre>article</genre>
+        <titleInfo><title>Computing</title></titleInfo>
+        <name type="personal">
+          <namePart type="family">Lovelace</namePart>
+          <namePart type="given">Ada</namePart>
+        </name>
+        <relatedItem type="host"><titleInfo><title>Notes</title></titleInfo></relatedItem>
+        <originInfo><dateIssued>1843</dateIssued><publisher>Example Press</publisher></originInfo>
+        <identifier type="doi">10.0000/example</identifier>
+        <location><url>https://example.test/paper</url></location>
+      </mods>
+    </modsCollection>
+    """
+    document = parse_bibliography(mods; format = :MODS)
+    @test document.format == :MODS
+    @test isempty(document.diagnostics)
+    @test length(document.entries) == 1
+    entry = document.entries[1]
+    @test entry.type == "article"
+    @test entry.title == "Computing"
+    @test entry.authors[1].last == "Lovelace"
+    @test entry.in.journal == "Notes"
+end
