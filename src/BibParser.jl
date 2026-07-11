@@ -29,6 +29,7 @@ For bibliography formats with formatting rules (such as `:BibTeX`), the `check` 
 parse_file(path, ::Val{:BibTeX}; check) = BibTeX.parse_file(path; check)
 parse_file(path, ::Val{:BibLaTeX}; check) = BibTeX.parse_file(path; check = :none)
 parse_file(path, ::Val{:CFF}; check) = CFF.parse_file(path)
+parse_file(path, ::Val{:CSL}; check) = CSL.parse_document(read(path, String)).entries
 
 parse_file(path, parser = :BibTeX; check = :error) = parse_file(path, Val(parser); check)
 
@@ -64,6 +65,9 @@ parse_bibliography(input, ::Val{:BibLaTeX}; check = :error) =
 
 parse_bibliography(input, ::Val{:CFF}; check = :error) =
     CFF.parse_document(_read_input(input))
+
+parse_bibliography(input, ::Val{:CSL}; check = :error) =
+    CSL.parse_document(_read_input(input))
 
 """
     parse_entry(entry::String; parser::Symbol = :BibTeX, check = :error)

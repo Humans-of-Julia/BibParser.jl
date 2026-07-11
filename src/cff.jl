@@ -43,47 +43,7 @@ On success, a BibInternal.Entry is returned. On failure, the error object is ret
 function parse_file(path; id = "")
     try
         content = YAML.load_file(path; dicttype = Dict{String, Any})
-        cff_version = content["cff-version"]
-        if !(cff_version in CFF_VERSIONS)
-            throw(UnsupportedCFFVersion(cff_version))
-        end
-
-        if !haskey(schemas, cff_version)
-            schemas[cff_version] = Schema(read(
-                joinpath(PACKAGE_ROOT, "src", "cff", "schema-$(cff_version).json"), String))
-        end
-
-        errors = validate(content, schemas[cff_version])
-        if !isnothing(errors)
-            @warn "Invalid CFF file; see schema guide for details: $(HELP_URL)"
-            @debug errors
-
-            return errors, false
-        end
-
-        if haskey(content, "preferred-citation")
-            content = content["preferred-citation"]
-        end
-
-        names = add_names(content)
-        access = add_access(content)
-        # no booktitle in CFF
-        booktitle = ""
-        date = add_date(content)
-        # editors appear only in references in CFF
-        editors = []
-        eprint = add_eprint(content)
-        title = content["title"] # always exists
-        id = isempty(id) ? generate_id(names, title, date.year, access.doi) : id
-        in_ = add_in(content)
-        fields = Dict()
-        note = get(content, "note", "")
-        type_ = add_type(content)
-
-        BibInternal.Entry(
-            access, names, booktitle, date, editors, eprint, id, in_, fields, note, title, type_
-        ),
-        true
+        return parse_content(content; id)
     catch err
         if isa(err, YAML.ParserError)
             print("Parse error invalid YAML: ")
@@ -92,6 +52,84 @@ function parse_file(path; id = "")
 
         err, false
     end
+end
+
+function parse_content(content; id = "")
+    cff_version = content["cff-version"]
+    if !(cff_version in CFF_VERSIONS)
+        throw(UnsupportedCFFVersion(cff_version))
+    end
+
+    if !haskey(schemas, cff_version)
+        schemas[cff_version] = Schema(read(
+            joinpath(PACKAGE_ROOT, "src", "cff", "schema-$(cff_version).json"), String))
+    end
+
+    errors = validate(content, schemas[cff_version])
+    if !isnothing(errors)
+        @warn "Invalid CFF file; see schema guide for details: $(HELP_URL)"
+        @debug errors
+
+        return errors, false
+    end
+
+    if haskey(content, "preferred-citation")
+        content = content["preferred-citation"]
+    end
+
+    names = add_names(content)
+    access = add_access(content)
+    booktitle = ""
+    date = add_date(content)
+    editors = []
+    eprint = add_eprint(content)
+    title = content["title"]
+    id = isempty(id) ? generate_id(names, title, date.year, access.doi) : id
+    in_ = add_in(content)
+    fields = Dict{String, String}()
+    note = get(content, "note", "")
+    type_ = add_type(content)
+
+    return BibInternal.Entry(
+        access, names, booktitle, date, editors, eprint, id, in_, fields, note, title, type_
+    ),
+    true
+end
+
+function parse_document(input::String)
+    diagnostics = BibInternal.Diagnostic[]
+    try
+        content = YAML.load(input; dicttype = Dict{String, Any})
+        entry, ok = parse_content(content)
+        if ok
+            raw = BibInternal.RawEntry(kind = "cff", key = entry.id, raw = input)
+            return BibInternal.BibliographyDocument(
+                format = :CFF,
+                entries = [BibInternal.LosslessEntry(entry, raw)],
+                source = input,
+            )
+        end
+        push!(
+            diagnostics,
+            BibInternal.Diagnostic(
+                code = :invalid_cff,
+                severity = BibInternal.diagnostic_error,
+                message = "Invalid CFF content.",
+                suggestion = "Validate the file against the CFF schema guide."
+            )
+        )
+    catch err
+        push!(
+            diagnostics,
+            BibInternal.Diagnostic(
+                code = :parse_error,
+                severity = BibInternal.diagnostic_error,
+                message = sprint(showerror, err),
+                suggestion = "Fix the CFF YAML or unsupported CFF version."
+            )
+        )
+    end
+    return BibInternal.BibliographyDocument(format = :CFF, diagnostics = diagnostics, source = input)
 end
 
 """

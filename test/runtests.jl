@@ -169,4 +169,45 @@ end
         @info expected_result
         @test result == expected_result
     end
+
+    @testset "CFF document API" begin
+        content = read(joinpath(PACKAGE_ROOT, "examples", "CITATION.cff"), String)
+        document = parse_bibliography(content; format = :CFF)
+        @test document.format == :CFF
+        @test isempty(document.diagnostics)
+        @test length(document.entries) == 1
+        @test document.entries[1].title == "Software paper"
+        @test document.entries[1].access.doi == "10.1234/zenodo.123456"
+    end
+end
+
+@testset "CSL-JSON" begin
+    csl = """
+    [
+      {
+        "id": "lovelace1843",
+        "type": "article-journal",
+        "title": "Computing",
+        "author": [{"family": "Lovelace", "given": "Ada"}],
+        "container-title": "Notes",
+        "issued": {"date-parts": [[1843, 1, 1]]},
+        "DOI": "10.0000/example",
+        "URL": "https://example.test/paper",
+        "volume": "1",
+        "issue": "2",
+        "page": "1-10"
+      }
+    ]
+    """
+    document = parse_bibliography(csl; format = :CSL)
+    @test document.format == :CSL
+    @test isempty(document.diagnostics)
+    @test length(document.entries) == 1
+    entry = document.entries[1]
+    @test entry.id == "lovelace1843"
+    @test entry.type == "article"
+    @test entry.title == "Computing"
+    @test entry.authors[1].last == "Lovelace"
+    @test entry.date.year == "1843"
+    @test entry.in.journal == "Notes"
 end
