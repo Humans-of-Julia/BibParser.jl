@@ -999,6 +999,7 @@ function parse_document(input::String; check = :error, format::Symbol = :BibTeX)
         entries = entries,
         blocks = blocks,
         diagnostics = diagnostics,
+        source = input,
     )
 end
 

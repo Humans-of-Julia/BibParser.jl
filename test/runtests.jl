@@ -140,6 +140,7 @@ const PACKAGE_ROOT = pkgdir(BibParser)
 
         document = parse_bibliography(bib; format = :BibTeX)
         @test document.format == :BibTeX
+        @test document.source == bib
         @test length(document.entries) == 1
         @test document.entries[1].id == "Key"
         @test document.entries[1].raw.kind == "article"
