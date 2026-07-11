@@ -35,7 +35,7 @@ Parse a bibliography file. Default to BibTeX format. Other options available: CF
 For bibliography formats with formatting rules (such as `:BibTeX`), the `check` keyword argument can be set to `:none` (or `nothing`), `:warn`, or `:error`.
 """
 parse_file(path, ::Val{:BibTeX}; check) = BibTeX.parse_file(path; check)
-parse_file(path, ::Val{:BibLaTeX}; check) = BibTeX.parse_file(path; check = :none)
+parse_file(path, ::Val{:BibLaTeX}; check) = BibTeX.parse_file(path; check, format = :BibLaTeX)
 parse_file(path, ::Val{:CFF}; check) = CFF.parse_file(path)
 parse_file(path, ::Val{:CSL}; check) = CSL.parse_document(read(path, String)).entries
 parse_file(path, ::Val{:RIS}; check) = RIS.parse_document(read(path, String)).entries
@@ -55,7 +55,7 @@ parse_string(input; format::Symbol = :BibTeX, check = :error) =
     parse_file(IOBuffer(input), Val(format); check)
 
 parse_file(io::IO, ::Val{:BibTeX}; check) = BibTeX.parse_string(read(io, String); check)
-parse_file(io::IO, ::Val{:BibLaTeX}; check) = BibTeX.parse_string(read(io, String); check = :none)
+parse_file(io::IO, ::Val{:BibLaTeX}; check) = BibTeX.parse_string(read(io, String); check, format = :BibLaTeX)
 
 """
     parse_bibliography(input; format::Symbol = :auto, check = :error)
@@ -72,7 +72,7 @@ parse_bibliography(input, ::Val{:BibTeX}; check = :error) =
     BibTeX.parse_document(_read_input(input); check, format = :BibTeX)
 
 parse_bibliography(input, ::Val{:BibLaTeX}; check = :error) =
-    BibTeX.parse_document(_read_input(input); check = :none, format = :BibLaTeX)
+    BibTeX.parse_document(_read_input(input); check, format = :BibLaTeX)
 
 parse_bibliography(input, ::Val{:CFF}; check = :error) =
     CFF.parse_document(_read_input(input))

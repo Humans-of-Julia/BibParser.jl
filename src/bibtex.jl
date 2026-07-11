@@ -219,6 +219,7 @@ A structure allowing to parse a BibTeX formatted string one character at a time.
 - `pos_end::Position`: pointer to the raw/col end position
 - `storage::Storage`: temporary storage of the content of an entry being parsed
 - `rules_checker::Bool`: indicate which level `:error`, `:warn`, or `:none` should be raised when an entry violates BibTeX rules
+- `format::Symbol`: bibliography ruleset used for canonical entry construction
 - `task::Symbol`: describe which part of the BibTeX gramma is being parsed
 """
 mutable struct Parser
@@ -230,6 +231,7 @@ mutable struct Parser
     pos_start::Position
     pos_end::Position
     rules_checker::Symbol
+    format::Symbol
     storage::Storage
     task::Symbol
 
@@ -242,6 +244,7 @@ mutable struct Parser
             pos_start = Position(1, 1),
             pos_end = Position(1, 0),
             rules_checker = :error,
+            format = :BibTeX,
             storage = Storage(),
             task = :free
     )
@@ -254,6 +257,7 @@ mutable struct Parser
             pos_start,
             pos_end,
             rules_checker,
+            format,
             storage,
             task
         )
@@ -294,7 +298,9 @@ function finalize_entry!(parser)
         end
     else
         entry = make_entry(parser.storage)
-        bibentry = BibInternal.make_bibtex_entry(key, entry; check)
+        bibentry = parser.format == :BibLaTeX ?
+                   BibInternal.make_biblatex_entry(key, entry; check) :
+                   BibInternal.make_bibtex_entry(key, entry; check)
         push!(parser.content.entries, key => bibentry)
     end
     parser.storage = Storage()
@@ -758,8 +764,8 @@ end
 
 Parse a BibTeX string of entries. Raise a detailed warning for each invalid entry.
 """
-function parse_string(str; check = :error)
-    parser = Parser(str; rules_checker = check)
+function parse_string(str; check = :error, format = :BibTeX)
+    parser = Parser(str; rules_checker = check, format)
     foreach(char -> parse!(parser, char), parser.input)
     foreach(error -> warn(error), parser.errors)
     return get_entries(parser)
@@ -770,7 +776,7 @@ end
 
 Parse a BibTeX file located at `path`. Raise a detailed warning for each invalid entry.
 """
-parse_file(path; check = :error) = parse_string(read(path, String); check)
+parse_file(path; check = :error, format = :BibTeX) = parse_string(read(path, String); check, format)
 
 function _source_span(input::String, start::Int, stop::Int)
     prefix = start == firstindex(input) ? "" : input[firstindex(input):prevind(input, start)]
@@ -893,7 +899,7 @@ function parse_document(input::String; check = :error, format::Symbol = :BibTeX)
     entries = BibInternal.LosslessEntry[]
     blocks = BibInternal.RawBlock[]
     diagnostics = BibInternal.Diagnostic[]
-    parsed_entries = parse_string(input; check)
+    parsed_entries = parse_string(input; check, format)
     cursor = firstindex(input)
     while cursor <= lastindex(input)
         at = findnext(==('@'), input, cursor)

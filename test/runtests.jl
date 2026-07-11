@@ -155,6 +155,100 @@ const PACKAGE_ROOT = pkgdir(BibParser)
     end
 end
 
+@testset "BibLaTeX" begin
+    biblatex = raw"""
+    Introductory free text should be preserved.
+
+    @online{doe2024,
+      author = {Doe, Jane and Smith, John},
+      title = {A Research Dataset},
+      date = {2024-03-15},
+      url = {https://example.test/data},
+      urldate = {2024-04-01},
+      eprint = {2401.00001},
+      eprinttype = {arXiv},
+      eprintclass = {cs.DL},
+      location = {Paris},
+      keywords = {data, reproducibility}
+    }
+
+    @article{lovelace1843,
+      author = {Lovelace, Ada},
+      title = {Notes on Computing},
+      journaltitle = {Scientific Memoirs},
+      date = {1843},
+      volume = {3},
+      number = {9},
+      pages = {666-731},
+      doi = {10.0000/lovelace}
+    }
+
+    @report{team2025,
+      author = {Research Team},
+      title = {Technical Findings},
+      type = {Technical report},
+      institution = {Example Lab},
+      date = {2025-02},
+      location = {Lyon}
+    }
+    """
+
+    parsed = BibParser.parse_string(biblatex; format = :BibLaTeX)
+    @test length(parsed) == 3
+
+    online = parsed["doe2024"]
+    @test online.type == "online"
+    @test online.authors[1].last == "Doe"
+    @test online.date.year == "2024"
+    @test online.date.month == "03"
+    @test online.date.day == "15"
+    @test online.access.url == "https://example.test/data"
+    @test online.eprint.eprint == "2401.00001"
+    @test online.eprint.archive_prefix == "arXiv"
+    @test online.eprint.primary_class == "cs.DL"
+    @test online.in.address == "Paris"
+    @test online.fields["date"] == "2024-03-15"
+    @test online.fields["keywords"] == "data, reproducibility"
+
+    article = parsed["lovelace1843"]
+    @test article.type == "article"
+    @test article.in.journal == "Scientific Memoirs"
+    @test article.date.year == "1843"
+    @test article.access.doi == "10.0000/lovelace"
+
+    report = parsed["team2025"]
+    @test report.type == "report"
+    @test report.in.institution == "Example Lab"
+    @test report.date.year == "2025"
+    @test report.date.month == "02"
+    @test report.in.address == "Lyon"
+    @test report.fields["type"] == "Technical report"
+
+    document = parse_bibliography(biblatex; format = :BibLaTeX)
+    @test document.format == :BibLaTeX
+    @test length(document.entries) == 3
+    @test count(block -> block.kind == :free, document.blocks) == 1
+    @test any(field -> field.name == "journaltitle" && field.value == "Scientific Memoirs",
+        document.entries[2].raw.fields)
+    @test document.entries[1].canonical.in.address == "Paris"
+end
+
+@testset "BibLaTeX validation" begin
+    missing = """
+    @article{missingdate,
+      author = {Doe, Jane},
+      title = {Missing Date},
+      journaltitle = {Journal}
+    }
+    """
+
+    @test_throws "missing required field date" BibParser.parse_string(missing; format = :BibLaTeX)
+    parsed = @test_logs (:warn, r"missing required field date") BibParser.parse_string(
+        missing; format = :BibLaTeX, check = :warn)
+    @test haskey(parsed, "missingdate")
+    @test isempty(parsed["missingdate"].date.year)
+end
+
 @testset "CFF" begin
     files = [
         ("CITATION.cff", true),
