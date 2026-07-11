@@ -115,9 +115,14 @@ function detect_format(input)
     startswith(content, "@") && return :BibTeX
     (startswith(content, "{") || startswith(content, "[")) && return :CSL
     occursin("cff-version:", content) && return :CFF
-    occursin(r"(?m)^TY  - ", content) && return :RIS
-    startswith(content, "<") && return :MODS
+    occursin(r"(?m)^\s*TY  - ?", content) && return :RIS
+    startswith(content, "<") && return detect_xml_format(content)
     return :BibTeX
+end
+
+function detect_xml_format(content::AbstractString)
+    occursin(r"<\s*(records?|rec-number|ref-type)\b", content) && return :EndNote
+    return :MODS
 end
 
 end # module

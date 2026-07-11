@@ -35,7 +35,7 @@ function parse_records(input::String)
     last_tag = ""
     for line in split(input, '\n')
         isempty(strip(line)) && continue
-        m = match(r"^([A-Z0-9]{2})  - (.*)$", line)
+        m = match(r"^\s*([A-Z0-9]{2})  - ?(.*)$", line)
         if isnothing(m)
             if !isempty(last_tag)
                 current[last_tag][end] *= "\n" * strip(line)

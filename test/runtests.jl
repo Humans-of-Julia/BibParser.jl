@@ -334,6 +334,33 @@ end
     @test entry.authors[1].last == "Lovelace"
     @test entry.date.year == "1843"
     @test entry.in.journal == "Notes"
+
+    csl_object = """
+    {
+      "id": "collective2024",
+      "type": "book",
+      "title": "Collected Work",
+      "author": [{"literal": "The Example Consortium"}],
+      "editor": [{"family": "Editor", "given": "Erin"}],
+      "issued": {"raw": "forthcoming"},
+      "publisher": "Example Press",
+      "publisher-place": "Paris",
+      "ISBN": "978-0-00-000000-0",
+      "note": "Object form, not an array"
+    }
+    """
+    document = parse_bibliography(csl_object; format = :CSL)
+    @test document.format == :CSL
+    @test length(document.entries) == 1
+    entry = document.entries[1]
+    @test entry.id == "collective2024"
+    @test entry.type == "book"
+    @test entry.authors[1].last == "The Example Consortium"
+    @test entry.editors[1].last == "Editor"
+    @test entry.date.year == "forthcoming"
+    @test entry.in.publisher == "Example Press"
+    @test entry.in.address == "Paris"
+    @test entry.in.isbn == "978-0-00-000000-0"
 end
 
 @testset "RIS" begin
@@ -362,6 +389,38 @@ end
     @test entry.authors[1].last == "Lovelace"
     @test entry.date.year == "1843"
     @test entry.in.pages == "1--10"
+
+    ris_multi = """
+    TY  - BOOK
+    ID  - book1
+    AU  - Hopper, Grace
+    TI  - Compilers
+    PY  - 1952
+    PB  - Example Press
+    N1  - First note line
+          continued note line
+    ER  -
+
+    TY  - CONF
+    ID  - conf1
+    A1  - Turing, Alan
+    ED  - Editor, Erin
+    T1  - Conference Paper
+    T2  - Proceedings
+    Y1  - 1936/5
+    SP  - 20
+    EP  - 30
+    ER  -
+    """
+    document = parse_bibliography(ris_multi; format = :RIS)
+    @test length(document.entries) == 2
+    @test document.entries[1].type == "book"
+    @test occursin("continued note line", document.entries[1].note)
+    @test document.entries[2].type == "inproceedings"
+    @test document.entries[2].booktitle == "Proceedings"
+    @test document.entries[2].editors[1].last == "Editor"
+    @test document.entries[2].date.month == "5"
+    @test document.entries[2].in.pages == "20--30"
 end
 
 @testset "EndNote XML" begin
@@ -425,4 +484,46 @@ end
     @test entry.title == "Computing"
     @test entry.authors[1].last == "Lovelace"
     @test entry.in.journal == "Notes"
+end
+
+@testset "format detection and diagnostics" begin
+    bib = """
+    @article{auto,
+      author = {Doe, Jane},
+      title = {Auto},
+      journal = {Journal},
+      year = {2024}
+    }
+    """
+    @test parse_bibliography(bib).format == :BibTeX
+    @test parse_bibliography("cff-version: 1.2.0\nbad: true").format == :CFF
+    @test parse_bibliography("""[{"id":"x","type":"book","title":"T"}]""").format == :CSL
+    @test parse_bibliography("TY  - JOUR\nTI  - R\nER  -").format == :RIS
+
+    endnote = """
+    <xml><records><record><rec-number>1</rec-number><ref-type>Book</ref-type>
+    <titles><title><style>Detected</style></title></titles></record></records></xml>
+    """
+    mods = """
+    <mods xmlns="http://www.loc.gov/mods/v3"><titleInfo><title>Detected</title></titleInfo></mods>
+    """
+    @test parse_bibliography(endnote).format == :EndNote
+    @test parse_bibliography(mods).format == :MODS
+
+    @test !isempty(parse_bibliography("{invalid json"; format = :CSL).diagnostics)
+    @test !isempty(parse_bibliography("<xml><record>"; format = :EndNote).diagnostics)
+    @test !isempty(parse_bibliography("<mods>"; format = :MODS).diagnostics)
+
+    mktempdir() do dir
+        bib_path = joinpath(dir, "refs.bib")
+        ris_path = joinpath(dir, "refs.ris")
+        endnote_path = joinpath(dir, "refs.xml")
+        write(bib_path, bib)
+        write(ris_path, "TY  - BOOK\nID  - filebook\nTI  - From File\nER  -")
+        write(endnote_path, endnote)
+
+        @test parse_bibliography(bib_path).format == :BibTeX
+        @test parse_bibliography(ris_path).entries[1].id == "filebook"
+        @test parse_bibliography(endnote_path).format == :EndNote
+    end
 end
