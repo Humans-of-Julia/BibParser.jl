@@ -389,8 +389,14 @@ function dump!(parser, char, ::Val{:entry})
         acc = split(lowercase(get_acc(parser; from = 2)), r"[\t ]+")
         if length(acc) ≤ 1 && !isempty(acc[1])
             set_entry_kind!(parser, acc[1])
-            # parser.task = acc[1] ∈ ["comment", "preamble", "string"] ? Symbol(acc[1]) : :key
-            parser.task = acc[1] ∈ ["string"] ? Symbol(acc[1]) : :key
+            if acc[1] == "string"
+                parser.task = :string
+            elseif acc[1] ∈ ["comment", "preamble"]
+                parser.field.braces = 1
+                parser.task = :special
+            else
+                parser.task = :key
+            end
         else
             parser.task = :free
             e = BibTeXError(
@@ -663,6 +669,25 @@ function dump!(parser, char, ::Val{:field_next})
         end
     elseif char == rev(parser.storage.delim)
         finalize_entry!(parser)
+    end
+end
+
+function is_dumped(parser, char, ::Val{:special})
+    if char == parser.storage.delim
+        parser.field.braces += 1
+        return false
+    elseif char == rev(parser.storage.delim)
+        parser.field.braces -= 1
+        return parser.field.braces == 0
+    else
+        return false
+    end
+end
+function dump!(parser, char, ::Val{:special})
+    if char == rev(parser.storage.delim)
+        parser.field = Field()
+        parser.storage = Storage()
+        parser.task = :free
     end
 end
 

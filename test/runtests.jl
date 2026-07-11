@@ -153,6 +153,36 @@ const PACKAGE_ROOT = pkgdir(BibParser)
         @test :comment in map(block -> block.kind, document.blocks)
         @test count(block -> block.kind == :free, document.blocks) == 2
     end
+
+    @testset "BibTeX special blocks and delimiters are parsed quietly" begin
+        bib = raw"""
+        @string{jtest = "Journal of Testing"}
+
+        @comment{This includes a fake entry: @article{nope, title = {Ignored}}}
+
+        @preamble{"\newcommand{\noop}[1]{}"}
+
+        @article(KeyParen,
+          author = {Doe, Jane},
+          title = "A " # "Nested {Brace}" # " Title",
+          journal = jtest,
+          year = 2020
+        )
+        """
+
+        legacy = @test_logs BibParser.parse_string(bib; format = :BibTeX)
+        @test collect(keys(legacy)) == ["KeyParen"]
+        @test legacy["KeyParen"].title == "A Nested {Brace} Title"
+        @test legacy["KeyParen"].in.journal == "Journal of Testing"
+
+        document = @test_logs parse_bibliography(bib; format = :BibTeX)
+        @test length(document.entries) == 1
+        @test document.entries[1].id == "KeyParen"
+        @test :comment in map(block -> block.kind, document.blocks)
+        @test :preamble in map(block -> block.kind, document.blocks)
+        @test !any(entry -> entry.id == "nope", document.entries)
+        @test document.entries[1].raw.span.start_line == 7
+    end
 end
 
 @testset "BibLaTeX" begin
