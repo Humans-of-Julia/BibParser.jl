@@ -5,14 +5,18 @@ import BibInternal
 const RIS_TO_BIBTEX_TYPES = Dict{String, String}(
     "JOUR" => "article",
     "MGZN" => "article",
+    "NEWS" => "article",
     "BOOK" => "book",
+    "EBOOK" => "book",
     "CHAP" => "incollection",
+    "ECHAP" => "incollection",
     "CONF" => "inproceedings",
     "CPAPER" => "inproceedings",
     "RPRT" => "techreport",
     "THES" => "phdthesis",
+    "UNPB" => "unpublished",
     "ELEC" => "misc",
-    "GEN" => "misc",
+    "GEN" => "misc"
 )
 
 function _push_tag!(records, current, tag, value)
@@ -42,7 +46,8 @@ function parse_records(input::String)
             end
             continue
         end
-        tag, value = m.captures
+        tag = something(m.captures[1], "")
+        value = something(m.captures[2], "")
         current = _push_tag!(records, current, tag, strip(value))
         last_tag = tag == "ER" ? "" : tag
     end
@@ -119,10 +124,13 @@ function parse_entry(record)
         "",
         _first(record, "VL")
     )
-    fields = Dict{String, String}()
+    fields = Dict(
+        "ris:" * lowercase(tag) => join(values, "\n") for (tag, values) in record
+    )
     note = _first(record, "N1", "AB")
     eprint = BibInternal.Eprint("", "", "")
-    return BibInternal.Entry(access, authors, booktitle, date, editors, eprint, id, in_, fields, note, title, type)
+    return BibInternal.Entry(access, authors, booktitle, date, editors,
+        eprint, id, in_, fields, note, title, type)
 end
 
 function parse_document(input::String)
@@ -132,10 +140,16 @@ function parse_document(input::String)
         for record in parse_records(input)
             haskey(record, "TY") || continue
             entry = parse_entry(record)
-            raw = BibInternal.RawEntry(kind = "ris", key = entry.id, raw = join(vcat([tag * "  - " * value for (tag, values) in record for value in values]), "\n"))
+            raw = BibInternal.RawEntry(kind = "ris",
+                key = entry.id,
+                raw = join(
+                    vcat([tag * "  - " * value for (tag, values) in record
+                          for value in values]),
+                    "\n"))
             push!(entries, BibInternal.LosslessEntry(entry, raw))
         end
-        return BibInternal.BibliographyDocument(format = :RIS, entries = entries, source = input)
+        return BibInternal.BibliographyDocument(
+            format = :RIS, entries = entries, source = input)
     catch err
         push!(
             diagnostics,
@@ -147,7 +161,8 @@ function parse_document(input::String)
             )
         )
     end
-    return BibInternal.BibliographyDocument(format = :RIS, diagnostics = diagnostics, source = input)
+    return BibInternal.BibliographyDocument(
+        format = :RIS, diagnostics = diagnostics, source = input)
 end
 
 end

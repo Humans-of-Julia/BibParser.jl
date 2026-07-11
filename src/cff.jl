@@ -16,7 +16,7 @@ const CFF_VERSIONS = Set(["1.2.0"])
 const HELP_URL = "https://github.com/citation-file-format/citation-file-format/blob/main/schema-guide.md"
 const PACKAGE_ROOT = module_path()
 const schemas = Dict{String, Schema}()
-const current_id = 0
+const current_id = Ref(0)
 
 """
 Simple error struct used to abort parsing if the CFF version is not supported or invalid.
@@ -45,9 +45,6 @@ function parse_file(path; id = "")
         content = YAML.load_file(path; dicttype = Dict{String, Any})
         return parse_content(content; id)
     catch err
-        if isa(err, YAML.ParserError)
-            print("Parse error invalid YAML: ")
-        end
         @warn err
 
         err, false
@@ -86,7 +83,9 @@ function parse_content(content; id = "")
     title = content["title"]
     id = isempty(id) ? generate_id(names, title, date.year, access.doi) : id
     in_ = add_in(content)
-    fields = Dict{String, String}()
+    fields = Dict{String, String}(
+        string(key) => string(value) for (key, value) in content
+    )
     note = get(content, "note", "")
     type_ = add_type(content)
 
@@ -106,7 +105,7 @@ function parse_document(input::String)
             return BibInternal.BibliographyDocument(
                 format = :CFF,
                 entries = [BibInternal.LosslessEntry(entry, raw)],
-                source = input,
+                source = input
             )
         end
         push!(
@@ -129,7 +128,8 @@ function parse_document(input::String)
             )
         )
     end
-    return BibInternal.BibliographyDocument(format = :CFF, diagnostics = diagnostics, source = input)
+    return BibInternal.BibliographyDocument(
+        format = :CFF, diagnostics = diagnostics, source = input)
 end
 
 """
@@ -166,11 +166,12 @@ end
     add_date(content::Dict{String, Any}) -> BibInternal.Date
 """
 function add_date(content)
-    date = get(content, "date-released", "")
+    date = string(get(content, "date-released", get(content, "year", "")))
     if isempty(date)
         return BibInternal.Date("", "", "")
     end
 
+    occursin(r"^\d{4}$", date) && return BibInternal.Date("", "", date)
     date = Date(date, dateformat"yyyy-mm-dd")
 
     BibInternal.Date(
@@ -196,7 +197,8 @@ function generate_id(names, title, year, doi)
     replace_dict[' '] = separator
     replace_func = str -> join(map(c -> get(replace_dict, c, "$c"), collect(str)))
 
-    dash_title = replace_func(title)[1:5]
+    normalized_title = replace_func(title)
+    dash_title = first(normalized_title, min(5, length(normalized_title)))
     names_prefix = join(
         map(
             x -> replace_func(x),
@@ -205,10 +207,11 @@ function generate_id(names, title, year, doi)
         separator
     )
 
-    prefix = join([names_prefix, dash_title, year], separator)
+    components = filter(!isempty, [names_prefix, dash_title, year])
+    prefix = isempty(components) ? "cff" : join(components, separator)
     if isempty(doi)
-        current_id += 1
-        "$(prefix)$(separator)$(current_id)"
+        current_id[] += 1
+        "$(prefix)$(separator)$(current_id[])"
     else
         "$(prefix)$(separator)$(doi)"
     end
@@ -244,16 +247,28 @@ end
 
 const CFF_TO_BIBTEX_TYPES = Dict{String, String}(
     [
+    "software" => "misc",
+    "dataset" => "misc",
     "article" => "article",
     "book" => "book",
     "manual" => "manual",
     "unpublished" => "unpublished",
     "conference" => "proceedings",
     "proceedings" => "proceedings",
-    "conference-paper" => "proceedings",
+    "conference-paper" => "inproceedings",
     "magazine-article" => "article",
     "newspaper-article" => "article",
-    "pamphlet" => "booklet"
+    "pamphlet" => "booklet",
+    "report" => "techreport",
+    "thesis" => "phdthesis",
+    "personal-communication" => "unpublished",
+    "generic" => "misc",
+    "data" => "misc",
+    "database" => "misc",
+    "patent" => "misc",
+    "map" => "misc",
+    "standard" => "misc",
+    "statute" => "misc"
 ]
 )
 
@@ -261,7 +276,7 @@ const CFF_TO_BIBTEX_TYPES = Dict{String, String}(
     add_type(content::Dict{String, Any}) -> String
 """
 function add_type(content)
-    get(CFF_TO_BIBTEX_TYPES, content["type"], "misc")
+    get(CFF_TO_BIBTEX_TYPES, string(get(content, "type", "software")), "misc")
 end
 
 """

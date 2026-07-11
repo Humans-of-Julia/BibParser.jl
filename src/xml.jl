@@ -68,7 +68,8 @@ function _entry(
 )
     eprint = BibInternal.Eprint("", "", "")
     isempty(id) && (id = replace(lowercase(title), r"[^a-z0-9]+" => "-"))
-    return BibInternal.Entry(access, authors, booktitle, date, editors, eprint, id, in_, raw_fields, note, title, type)
+    return BibInternal.Entry(access, authors, booktitle, date, editors,
+        eprint, id, in_, raw_fields, note, title, type)
 end
 
 function _endnote_names(record, role)
@@ -93,7 +94,7 @@ const ENDNOTE_TO_BIBTEX_TYPES = Dict{String, String}(
     "conference paper" => "inproceedings",
     "report" => "techreport",
     "thesis" => "phdthesis",
-    "web page" => "misc",
+    "web page" => "misc"
 )
 
 function _endnote_entry(record)
@@ -105,7 +106,8 @@ function _endnote_entry(record)
     authors = _endnote_names(record, "authors")
     editors = _endnote_names(record, "secondary-authors")
     year = _desc_text(record, "year")
-    access = BibInternal.Access(_desc_text(record, "electronic-resource-num"), "", _desc_text(record, "url"))
+    access = BibInternal.Access(
+        _desc_text(record, "electronic-resource-num"), "", _desc_text(record, "url"))
     in_ = BibInternal.In(
         _desc_text(record, "place-published"),
         "",
@@ -122,7 +124,8 @@ function _endnote_entry(record)
         "",
         _desc_text(record, "volume")
     )
-    return _entry(id, type, title, authors, editors, _date_from_year(year), access, in_; booktitle = secondary, note = _desc_text(record, "abstract"))
+    return _entry(id, type, title, authors, editors, _date_from_year(year), access,
+        in_; booktitle = secondary, note = _desc_text(record, "abstract"))
 end
 
 function parse_endnote_document(input::String)
@@ -133,14 +136,21 @@ function parse_endnote_document(input::String)
         entries = BibInternal.LosslessEntry[]
         for record in records
             entry = _endnote_entry(record)
-            raw = BibInternal.RawEntry(kind = "endnote", key = entry.id, raw = string(record))
+            raw = BibInternal.RawEntry(
+                kind = "endnote", key = entry.id, raw = string(record))
             push!(entries, BibInternal.LosslessEntry(entry, raw))
         end
-        return BibInternal.BibliographyDocument(format = :EndNote, entries = entries, source = input)
+        return BibInternal.BibliographyDocument(
+            format = :EndNote, entries = entries, source = input)
     catch err
-        push!(diagnostics, BibInternal.Diagnostic(code = :parse_error, severity = BibInternal.diagnostic_error, message = sprint(showerror, err), suggestion = "Fix the EndNote XML document."))
+        push!(diagnostics,
+            BibInternal.Diagnostic(
+                code = :parse_error, severity = BibInternal.diagnostic_error,
+                message = sprint(showerror, err),
+                suggestion = "Fix the EndNote XML document."))
     end
-    return BibInternal.BibliographyDocument(format = :EndNote, diagnostics = diagnostics, source = input)
+    return BibInternal.BibliographyDocument(
+        format = :EndNote, diagnostics = diagnostics, source = input)
 end
 
 function _mods_names(record)
@@ -169,7 +179,8 @@ end
 
 function _mods_entry(record)
     title = _desc_text(record, "title")
-    genre = lowercase(_desc_text(record, "genre", "typeOfResource"))
+    genre = lowercase(_desc_text(record, "genre"))
+    isempty(genre) && (genre = lowercase(_desc_text(record, "typeOfResource")))
     type = occursin("article", genre) ? "article" :
            occursin("book", genre) ? "book" :
            occursin("conference", genre) ? "inproceedings" : "misc"
@@ -182,9 +193,12 @@ function _mods_entry(record)
         isempty(host) || break
     end
     !isempty(host) && (journal = host)
-    access = BibInternal.Access(_desc_text(record, "identifier"), "", _desc_text(record, "url"))
-    in_ = BibInternal.In("", "", "", _desc_text(record, "publisher"), "", "", journal, "", "", "", _desc_text(record, "publisher"), "", "", "")
-    return _entry(id, type, title, _mods_names(record), BibInternal.Name[], date, access, in_; booktitle = host)
+    access = BibInternal.Access(
+        _desc_text(record, "identifier"), "", _desc_text(record, "url"))
+    in_ = BibInternal.In("", "", "", _desc_text(record, "publisher"), "", "", journal,
+        "", "", "", _desc_text(record, "publisher"), "", "", "")
+    return _entry(id, type, title, _mods_names(record),
+        BibInternal.Name[], date, access, in_; booktitle = host)
 end
 
 function parse_mods_document(input::String)
@@ -199,11 +213,17 @@ function parse_mods_document(input::String)
             raw = BibInternal.RawEntry(kind = "mods", key = entry.id, raw = string(record))
             push!(entries, BibInternal.LosslessEntry(entry, raw))
         end
-        return BibInternal.BibliographyDocument(format = :MODS, entries = entries, source = input)
+        return BibInternal.BibliographyDocument(
+            format = :MODS, entries = entries, source = input)
     catch err
-        push!(diagnostics, BibInternal.Diagnostic(code = :parse_error, severity = BibInternal.diagnostic_error, message = sprint(showerror, err), suggestion = "Fix the MODS XML document."))
+        push!(diagnostics,
+            BibInternal.Diagnostic(
+                code = :parse_error, severity = BibInternal.diagnostic_error,
+                message = sprint(showerror, err),
+                suggestion = "Fix the MODS XML document."))
     end
-    return BibInternal.BibliographyDocument(format = :MODS, diagnostics = diagnostics, source = input)
+    return BibInternal.BibliographyDocument(
+        format = :MODS, diagnostics = diagnostics, source = input)
 end
 
 end

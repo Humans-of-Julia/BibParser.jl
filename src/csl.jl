@@ -5,7 +5,7 @@ import JSON3
 
 function _string(value, default = "")
     value === nothing && return default
-    return String(value)
+    return string(value)
 end
 
 function _names(values)
@@ -16,7 +16,8 @@ function _names(values)
             BibInternal.Name("", _string(literal), "", "", "")
         else
             BibInternal.Name(
-                get(person, :non_dropping_particle, ""),
+                get(person, Symbol("non-dropping-particle"),
+                    get(person, :non_dropping_particle, "")),
                 get(person, :family, ""),
                 get(person, :suffix, ""),
                 get(person, :given, ""),
@@ -43,18 +44,42 @@ end
 const CSL_TO_BIBTEX_TYPES = Dict{String, String}(
     "article" => "article",
     "article-journal" => "article",
+    "article-magazine" => "article",
+    "article-newspaper" => "article",
     "book" => "book",
+    "classic" => "book",
+    "collection" => "book",
     "chapter" => "incollection",
+    "entry" => "incollection",
+    "entry-dictionary" => "incollection",
+    "entry-encyclopedia" => "incollection",
+    "manuscript" => "unpublished",
+    "pamphlet" => "booklet",
     "paper-conference" => "inproceedings",
     "report" => "techreport",
     "thesis" => "phdthesis",
-    "webpage" => "misc",
+    "webpage" => "misc"
 )
+
+function _fields(item)
+    fields = Dict{String, String}()
+    for (key, value) in pairs(item)
+        fields[string(key)] = if value === nothing
+            ""
+        elseif value isa AbstractString || value isa Number || value isa Bool
+            string(value)
+        else
+            JSON3.write(value)
+        end
+    end
+    return fields
+end
 
 function parse_entry(item)
     id = _string(get(item, :id, get(item, :DOI, "")))
     type = get(CSL_TO_BIBTEX_TYPES, _string(get(item, :type, "misc")), "misc")
-    access = BibInternal.Access(_string(get(item, :DOI, "")), "", _string(get(item, :URL, "")))
+    access = BibInternal.Access(
+        _string(get(item, :DOI, "")), "", _string(get(item, :URL, "")))
     authors = _names(get(item, :author, nothing))
     editors = _names(get(item, :editor, nothing))
     date = _date(get(item, :issued, nothing))
@@ -78,11 +103,12 @@ function parse_entry(item)
         "",
         _string(get(item, :volume, ""))
     )
-    fields = Dict{String, String}()
+    fields = _fields(item)
     note = _string(get(item, :note, ""))
     eprint = BibInternal.Eprint("", "", "")
     isempty(id) && (id = replace(lowercase(title), r"[^a-z0-9]+" => "-"))
-    return BibInternal.Entry(access, authors, booktitle, date, editors, eprint, id, in_, fields, note, title, type)
+    return BibInternal.Entry(access, authors, booktitle, date, editors,
+        eprint, id, in_, fields, note, title, type)
 end
 
 function parse_document(input::String)
@@ -93,10 +119,12 @@ function parse_document(input::String)
         entries = BibInternal.LosslessEntry[]
         for item in items
             entry = parse_entry(item)
-            raw = BibInternal.RawEntry(kind = "csl", key = entry.id, raw = JSON3.write(item))
+            raw = BibInternal.RawEntry(
+                kind = "csl", key = entry.id, raw = JSON3.write(item))
             push!(entries, BibInternal.LosslessEntry(entry, raw))
         end
-        return BibInternal.BibliographyDocument(format = :CSL, entries = entries, source = input)
+        return BibInternal.BibliographyDocument(
+            format = :CSL, entries = entries, source = input)
     catch err
         push!(
             diagnostics,
@@ -108,7 +136,8 @@ function parse_document(input::String)
             )
         )
     end
-    return BibInternal.BibliographyDocument(format = :CSL, diagnostics = diagnostics, source = input)
+    return BibInternal.BibliographyDocument(
+        format = :CSL, diagnostics = diagnostics, source = input)
 end
 
 end

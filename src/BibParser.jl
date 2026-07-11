@@ -13,21 +13,9 @@ include("utils.jl")
 include("bibtex.jl")
 using .BibTeX: BibTeX
 
-# CSL-JSON module
-include("csl.jl")
-using .CSL: CSL
-
-# CFF module
-include("cff.jl")
-using .CFF: CFF
-
 # RIS module
 include("ris.jl")
 using .RIS: RIS
-
-# XML bibliography formats
-include("xml.jl")
-using .XMLFormats: XMLFormats
 
 """
     parse_file(path::String, parser::Symbol = :BibTeX; check=:error)
@@ -35,12 +23,10 @@ Parse a bibliography file. Default to BibTeX format. Other options available: CF
 For bibliography formats with formatting rules (such as `:BibTeX`), the `check` keyword argument can be set to `:none` (or `nothing`), `:warn`, or `:error`.
 """
 parse_file(path, ::Val{:BibTeX}; check) = BibTeX.parse_file(path; check)
-parse_file(path, ::Val{:BibLaTeX}; check) = BibTeX.parse_file(path; check, format = :BibLaTeX)
-parse_file(path, ::Val{:CFF}; check) = CFF.parse_file(path)
-parse_file(path, ::Val{:CSL}; check) = CSL.parse_document(read(path, String)).entries
+function parse_file(path, ::Val{:BibLaTeX}; check)
+    BibTeX.parse_file(path; check, format = :BibLaTeX)
+end
 parse_file(path, ::Val{:RIS}; check) = RIS.parse_document(read(path, String)).entries
-parse_file(path, ::Val{:EndNote}; check) = XMLFormats.parse_endnote_document(read(path, String)).entries
-parse_file(path, ::Val{:MODS}; check) = XMLFormats.parse_mods_document(read(path, String)).entries
 
 parse_file(path, parser = :BibTeX; check = :error) = parse_file(path, Val(parser); check)
 
@@ -51,11 +37,13 @@ Parse bibliography content from a string and return entries in the legacy
 format. Prefer [`parse_bibliography`](@ref) when source preservation and
 diagnostics are needed.
 """
-parse_string(input; format::Symbol = :BibTeX, check = :error) =
-    parse_file(IOBuffer(input), Val(format); check)
+parse_string(input; format::Symbol = :BibTeX, check = :error) = parse_file(
+    IOBuffer(input), Val(format); check)
 
 parse_file(io::IO, ::Val{:BibTeX}; check) = BibTeX.parse_string(read(io, String); check)
-parse_file(io::IO, ::Val{:BibLaTeX}; check) = BibTeX.parse_string(read(io, String); check, format = :BibLaTeX)
+function parse_file(io::IO, ::Val{:BibLaTeX}; check)
+    BibTeX.parse_string(read(io, String); check, format = :BibLaTeX)
+end
 
 """
     parse_bibliography(input; format::Symbol = :auto, check = :error)
@@ -68,26 +56,25 @@ function parse_bibliography(input; format::Symbol = :auto, check = :error)
     return parse_bibliography(input, Val(detected); check)
 end
 
-parse_bibliography(input, ::Val{:BibTeX}; check = :error) =
+function parse_bibliography(input, ::Val{:BibTeX}; check = :error)
     BibTeX.parse_document(_read_input(input); check, format = :BibTeX)
+end
 
-parse_bibliography(input, ::Val{:BibLaTeX}; check = :error) =
+function parse_bibliography(input, ::Val{:BibLaTeX}; check = :error)
     BibTeX.parse_document(_read_input(input); check, format = :BibLaTeX)
+end
 
-parse_bibliography(input, ::Val{:CFF}; check = :error) =
-    CFF.parse_document(_read_input(input))
-
-parse_bibliography(input, ::Val{:CSL}; check = :error) =
-    CSL.parse_document(_read_input(input))
-
-parse_bibliography(input, ::Val{:RIS}; check = :error) =
+function parse_bibliography(input, ::Val{:RIS}; check = :error)
     RIS.parse_document(_read_input(input))
+end
 
-parse_bibliography(input, ::Val{:EndNote}; check = :error) =
-    XMLFormats.parse_endnote_document(_read_input(input))
+function parse_file(path, ::Val{format}; check) where {format}
+    throw(ArgumentError("The $format parser extension is not loaded."))
+end
 
-parse_bibliography(input, ::Val{:MODS}; check = :error) =
-    XMLFormats.parse_mods_document(_read_input(input))
+function parse_bibliography(input, ::Val{format}; check = :error) where {format}
+    throw(ArgumentError("The $format parser extension is not loaded."))
+end
 
 """
     parse_entry(entry::String; parser::Symbol = :BibTeX, check = :error)

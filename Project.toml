@@ -6,12 +6,19 @@ version = "0.2.3"
 [deps]
 BibInternal = "2027ae74-3657-4b95-ae00-e2f7d55c3e64"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
+
+[weakdeps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 EzXML = "8f5d6c58-4d21-5cfd-889c-e3ad7ee6a615"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 JSONSchema = "7d188eb4-7ad8-530c-ae41-71a32a6d4692"
-TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
+
+[extensions]
+BibParserCFFExt = ["Dates", "JSONSchema", "YAML"]
+BibParserCSLExt = "JSON3"
+BibParserXMLExt = "EzXML"
 
 [compat]
 BibInternal = "0.3.7"
@@ -28,8 +35,9 @@ julia = "1.10"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 
 [targets]
-test = ["Aqua", "ExplicitImports", "JET", "Test", "TestItemRunner"]
+test = ["Aqua", "ExplicitImports", "EzXML", "JET", "JSON3", "JSONSchema", "Logging", "Test", "TestItemRunner", "YAML"]

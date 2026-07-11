@@ -504,9 +504,7 @@ function dump!(parser, char, ::Val{:field_inbrace})
         push!(parser.errors, e)
     elseif char == '}'
         parser.field.value *= get_acc(parser; from = 2)
-        push!(parser.storage.fields, deepcopy(parser.field))
-        parser.field.value = ""
-        parser.task = :field_out
+        parser.task = :field_outquote
     end
 end
 
@@ -547,7 +545,7 @@ function dump!(parser, char, ::Val{:field_outquote})
     end
 end
 
-is_dumped(::Parser, char, ::Val{:field_concat}) = occurs_in(r"[a-zA-Z\"@]", char)
+is_dumped(::Parser, char, ::Val{:field_concat}) = occurs_in(r"[0-9a-zA-Z\"{@]", char)
 function dump!(parser, char, ::Val{:field_concat})
     if char == '@'
         parser.task = :entry
@@ -559,6 +557,11 @@ function dump!(parser, char, ::Val{:field_concat})
         parser.pos_start.col += 1
         parser.acc.from += 1
         parser.task = :field_inquote
+    elseif char == '{'
+        parser.task = :field_inbrace
+        parser.field.braces += 1
+    elseif occurs_in(r"[0-9]", char)
+        parser.task = :field_number
     elseif occurs_in(r"[a-zA-Z]", char)
         parser.task = :field_var
     end
@@ -600,7 +603,9 @@ function dump!(parser, char, ::Val{:field_var})
     end
 end
 
-is_dumped(parser, char, ::Val{:field_number}) = char ∈ ['@', ',', rev(parser.storage.delim)]
+function is_dumped(parser, char, ::Val{:field_number})
+    char ∈ ['@', ',', '#', rev(parser.storage.delim)]
+end
 function dump!(parser, char, ::Val{:field_number})
     if char == '@'
         parser.task = :entry
@@ -612,9 +617,13 @@ function dump!(parser, char, ::Val{:field_number})
         acc = split(get_acc(parser), r"[\t\r\n ]+"; keepempty = false)
         # @show acc
         if length(acc) == 1
-            parser.field.value = acc[1]
-            push!(parser.storage.fields, deepcopy(parser.field))
-            parser.field.value = ""
+            parser.field.value *= acc[1]
+            if char == '#'
+                parser.task = :field_concat
+            else
+                push!(parser.storage.fields, deepcopy(parser.field))
+                parser.field.value = ""
+            end
             if char == ','
                 parser.task = :field_next
             elseif char == rev(parser.storage.delim)
@@ -734,12 +743,14 @@ end
 is_dumped(::Parser, char, ::Val{:string_value}) = char ∈ ['"']
 function dump!(parser, char, ::Val{:string_value})
     if char == '"'
-        parser.field.value = get_acc(parser; from = 2)
+        parser.field.value *= get_acc(parser; from = 2)
         parser.task = :string_outquote
     end
 end
 
-is_dumped(parser, char, ::Val{:string_outquote}) = char ∈ [rev(parser.storage.delim), '@']
+function is_dumped(parser, char, ::Val{:string_outquote})
+    char ∈ ['#', rev(parser.storage.delim), '@']
+end
 function dump!(parser, char, ::Val{:string_outquote})
     if char == '@'
         parser.task = :entry
@@ -747,6 +758,8 @@ function dump!(parser, char, ::Val{:string_outquote})
             :incomplete_entry, get_acc(parser), parser.pos_start, parser.pos_end
         )
         push!(parser.errors, e)
+    elseif char == '#'
+        parser.task = :string_inquote
     elseif char == rev(parser.storage.delim)
         parser.content.strings[parser.field.name] = parser.field.value
         parser.field = Field()
@@ -801,10 +814,12 @@ end
 
 Parse a BibTeX file located at `path`. Raise a detailed warning for each invalid entry.
 """
-parse_file(path; check = :error, format = :BibTeX) = parse_string(read(path, String); check, format)
+parse_file(path; check = :error, format = :BibTeX) = parse_string(
+    read(path, String); check, format)
 
 function _source_span(input::String, start::Int, stop::Int)
-    prefix = start == firstindex(input) ? "" : input[firstindex(input):prevind(input, start)]
+    prefix = start == firstindex(input) ? "" :
+             input[firstindex(input):prevind(input, start)]
     body = input[start:stop]
     start_line = count(==('\n'), prefix) + 1
     last_newline = findlast(==('\n'), prefix)
@@ -818,7 +833,7 @@ function _source_span(input::String, start::Int, stop::Int)
         start_line = start_line,
         start_column = start_column,
         end_line = end_line,
-        end_column = end_column,
+        end_column = end_column
     )
 end
 
@@ -847,8 +862,13 @@ end
 
 function _header(raw::String)
     m = match(r"(?is)^\s*@\s*([A-Za-z]+)\s*([\{\(])", raw)
-    isnothing(m) && return "", nothing
-    return lowercase(m.captures[1]), only(m.captures[2])
+    isnothing(m) && return "", '\0'
+    kind = something(m.captures[1], "")
+    delimiter = something(m.captures[2], "")
+    if isempty(kind) || isempty(delimiter)
+        return "", '\0'
+    end
+    return lowercase(kind), only(delimiter)
 end
 
 function _body(raw::String)
@@ -906,7 +926,8 @@ function _raw_fields(raw::String)
         name = strip(stripped[begin:prevind(stripped, eq)])
         value = strip(stripped[nextind(stripped, eq):end])
         if !isempty(value) && first(value) in ['{', '"'] && last(value) in ['}', '"']
-            value = value[nextind(value, firstindex(value)):prevind(value, lastindex(value))]
+            value = value[nextind(value, firstindex(value)):prevind(
+                value, lastindex(value))]
         end
         push!(raw_fields, BibInternal.RawField(name = name, value = value, raw = stripped))
     end
@@ -930,7 +951,8 @@ function parse_document(input::String; check = :error, format::Symbol = :BibTeX)
         at = findnext(==('@'), input, cursor)
         if isnothing(at)
             raw = input[cursor:end]
-            isempty(strip(raw)) || push!(blocks, BibInternal.RawBlock(kind = :free, raw = raw))
+            isempty(strip(raw)) ||
+                push!(blocks, BibInternal.RawBlock(kind = :free, raw = raw))
             break
         end
         if at > cursor
@@ -947,7 +969,9 @@ function parse_document(input::String; check = :error, format::Symbol = :BibTeX)
         open_at = findnext(c -> c in ['{', '('], input, at)
         if isnothing(open_at)
             raw = input[at:end]
-            push!(blocks, BibInternal.RawBlock(kind = :free, raw = raw, span = _source_span(input, at, lastindex(input))))
+            push!(blocks,
+                BibInternal.RawBlock(kind = :free, raw = raw,
+                    span = _source_span(input, at, lastindex(input))))
             break
         end
         stop = _entry_end(input, open_at, input[open_at])
@@ -965,7 +989,7 @@ function parse_document(input::String; check = :error, format::Symbol = :BibTeX)
                         key = key,
                         fields = _raw_fields(raw),
                         raw = raw,
-                        span = span,
+                        span = span
                     )
                     push!(entries, BibInternal.LosslessEntry(entry, raw_entry))
                 end
@@ -988,7 +1012,7 @@ function parse_document(input::String; check = :error, format::Symbol = :BibTeX)
                     kind = block_kind,
                     key = kind == "string" ? _entry_key(raw) : "",
                     raw = raw,
-                    span = span,
+                    span = span
                 )
             )
         end
@@ -999,7 +1023,7 @@ function parse_document(input::String; check = :error, format::Symbol = :BibTeX)
         entries = entries,
         blocks = blocks,
         diagnostics = diagnostics,
-        source = input,
+        source = input
     )
 end
 
