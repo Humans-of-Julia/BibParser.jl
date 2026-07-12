@@ -7,12 +7,16 @@
 
 # BibParser.jl
 
-BibParser is a Julia package for importing bibliographic formats into
-`BibInternal.Entry` and lossless `BibInternal.BibliographyDocument` values.
+BibParser is the import layer of the bibliography stack.
+
+It reads bibliographic source formats and projects them into
+`BibInternal.Entry` or lossless `BibInternal.BibliographyDocument` values.
 The supported formats are BibTeX, BibLaTeX, RIS, CFF 1.2, CSL-JSON, EndNote
 XML, and MODS 3.x.
 
-This package is not meant to be used on its own. Please check [Bibliography.jl]([https://](https://github.com/Humans-of-Julia/Bibliography.jl)) for a package handling both import/export from various bibliographic formats.
+This package is usually used through `Bibliography.jl`, which provides the
+high-level import/export API. Using `BibParser.jl` directly is still useful when
+you want to parse a format without writing it back immediately.
 
 The output of an example parsing a BibTeX file can be found at [baffier.fr/publications.html](https://baffier.fr/publications.html).
 
@@ -22,6 +26,9 @@ external parsing libraries are package extensions:
 - load `YAML` and `JSONSchema` to enable CFF;
 - load `JSON3` to enable CSL-JSON;
 - load `EzXML` to enable EndNote XML and MODS.
+
+Lossless parsing is available for the supported formats whenever the backend
+can preserve the raw source structure.
 
 For example:
 

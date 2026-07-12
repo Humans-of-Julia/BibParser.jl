@@ -1,3 +1,10 @@
+"""
+BibParser converts bibliography source formats into BibInternal data.
+
+The package focuses on parsing only. Use `parse_entry` and `parse_file` for the
+legacy entry dictionary workflow, or `parse_bibliography` when you want a
+lossless `BibInternal.BibliographyDocument`.
+"""
 module BibParser
 
 import TestItems: @testitem
@@ -19,8 +26,13 @@ using .RIS: RIS
 
 """
     parse_file(path::String, parser::Symbol = :BibTeX; check=:error)
-Parse a bibliography file. Default to BibTeX format. Other options available: CFF (CSL-JSON coming soon).
-For bibliography formats with formatting rules (such as `:BibTeX`), the `check` keyword argument can be set to `:none` (or `nothing`), `:warn`, or `:error`.
+
+Parse a bibliography file and return the legacy entry representation.
+
+The default parser is `:BibTeX`. Use `:BibLaTeX` or `:RIS` directly in the
+core package, and install the relevant extensions to enable the other formats.
+For bibliography formats with validation rules, `check` can be `:none`,
+`nothing`, `:warn`, or `:error`.
 """
 parse_file(path, ::Val{:BibTeX}; check) = BibTeX.parse_file(path; check)
 function parse_file(path, ::Val{:BibLaTeX}; check)
@@ -48,8 +60,8 @@ end
 """
     parse_bibliography(input; format::Symbol = :auto, check = :error)
 
-Parse a bibliography and return a `BibInternal.BibliographyDocument` preserving
-raw source blocks where the parser supports lossless mode.
+Parse a bibliography and return a `BibInternal.BibliographyDocument`
+preserving raw source blocks where the parser supports lossless mode.
 """
 function parse_bibliography(input; format::Symbol = :auto, check = :error)
     detected = format == :auto ? detect_format(input) : format
@@ -78,9 +90,11 @@ end
 
 """
     parse_entry(entry::String; parser::Symbol = :BibTeX, check = :error)
-Parse a string entry. Default to BibTeX format. No other options available yet (CSL-JSON coming soon).
 
-For bibliography formats with formatting rules (such as `:BibTeX`), the `check` keyword argument can be set to `:none` (or `nothing`), `:warn`, or `:error`.
+Parse a single BibTeX entry string using the legacy parser.
+
+For bibliography formats with validation rules, the `check` keyword argument
+can be set to `:none`, `nothing`, `:warn`, or `:error`.
 """
 function parse_entry(entry; parser = :BibTeX, check = :error)
     return parser == :BibTeX && return BibTeX.parse_string(entry; check)
@@ -96,6 +110,11 @@ function _read_input(input)
     end
 end
 
+"""
+    detect_format(input)
+
+Best-effort format detection used by `parse_bibliography` when `format = :auto`.
+"""
 function detect_format(input)
     content = strip(_read_input(input))
     isempty(content) && return :BibTeX
@@ -107,6 +126,11 @@ function detect_format(input)
     return :BibTeX
 end
 
+"""
+    detect_xml_format(content::AbstractString)
+
+Heuristic XML format detection used by the parser extensions.
+"""
 function detect_xml_format(content::AbstractString)
     occursin(r"<\s*(records?|rec-number|ref-type)\b", content) && return :EndNote
     return :MODS
