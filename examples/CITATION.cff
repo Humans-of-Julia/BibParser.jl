@@ -15,7 +15,7 @@ keywords:
   - "awesome software"
   - research
 license: Apache-2.0
-repository-code: "https://github.com/Humans-of-Julia/Bibliography.jl"
+repository-code: "https://github.com/JuliaBibliographies/Bibliography.jl"
 version: 0.11.2
 message: "If you use this software, please cite both the article from preferred-citation and the software itself."
 preferred-citation:
@@ -32,7 +32,7 @@ preferred-citation:
     - description: Some description
       type: doi
       value: 10.1234/zenodo.123456
-  repository-code: "https://github.com/Humans-of-Julia/BibParser.jl"
+  repository-code: "https://github.com/JuliaBibliographies/BibParser.jl"
   date-released: "2021-09-03"
   publisher:
     name: Some publisher

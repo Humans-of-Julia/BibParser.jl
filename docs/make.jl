@@ -3,9 +3,10 @@ using Documenter, BibParser, BibInternal
 makedocs(
     sitename = "BibParser.jl",
     authors = "Jean-François BAFFIER",
-    repo = "https://github.com/Humans-of-Julia/BibParser.jl/blob/{commit}{path}#L{line}",
     format = Documenter.HTML(
-        prettyurls = get(ENV, "CI", nothing) == "true"
+        prettyurls = true,
+        canonical = "https://juliabibliographies.github.io/BibParser.jl",
+        edit_link = "master"
     ),
     pages = [
         "BibParser" => "index.md",
@@ -16,4 +17,4 @@ makedocs(
     ]
 )
 
-deploydocs(; repo = "github.com/Humans-of-Julia/BibParser.jl.git", devbranch = "master")
+deploydocs(; repo = "github.com/JuliaBibliographies/BibParser.jl.git", devbranch = "master")
